@@ -689,6 +689,7 @@ def dashboard():
                 <button class="btn btn-danger" onclick="stopTests()" id="stop-btn">🛑 ARRÊT D'URGENCE</button>
                 <button class="btn btn-info" onclick="refreshData()">🔄 Actualiser</button>
                 <button class="btn btn-warning" onclick="clearLogs()">🗑️ Clear Logs</button>
+                <a href="/logout" class="btn" style="background: #6c757d; color: white;">🚪 Déconnexion</a>
             </div>
         </div>
 
@@ -1159,6 +1160,13 @@ def login():
     '''
     
     return render_template_string(login_template, error_message=error_message)
+
+@app.route('/logout')
+def logout():
+    """Déconnexion et suppression de la session"""
+    session.clear()
+    logging.info("🔐 Déconnexion effectuée")
+    return redirect(url_for('login'))
 
 def run_standard_survey():
     """Exécute le script standard 10 fois avec pauses aléatoires"""
