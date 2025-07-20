@@ -692,12 +692,20 @@ def dashboard():
         #last-executions p { color: hsl(215, 20%, 65%); margin-bottom: 4px; }
         
         /* Styles du calendrier */
+        .calendar-grid {
+            display: grid; 
+            grid-template-columns: repeat(7, 1fr); 
+            gap: 8px; 
+            margin-bottom: 16px;
+        }
+        
         .calendar-day {
             width: 40px; height: 40px; border: 1px solid hsl(216, 34%, 17%);
             background: hsl(224, 71%, 4%); color: hsl(213, 31%, 91%);
             border-radius: 8px; cursor: pointer; transition: all 0.2s;
             display: flex; align-items: center; justify-content: center;
             font-weight: 500; font-size: 14px;
+            min-width: 0; /* Permet au flex item de rétrécir */
         }
         .calendar-day:hover {
             border-color: hsl(262, 83%, 58%);
@@ -717,6 +725,43 @@ def dashboard():
             .container { padding: 16px; }
             .status-grid { grid-template-columns: 1fr; }
             body { padding: 16px; }
+            
+            /* Calendrier responsive */
+            .calendar-grid {
+                gap: 6px;
+            }
+            
+            .calendar-day {
+                width: 36px; 
+                height: 36px;
+                font-size: 12px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            /* Très petits écrans */
+            .calendar-grid {
+                gap: 4px;
+            }
+            
+            .calendar-day {
+                width: 32px; 
+                height: 32px;
+                font-size: 11px;
+            }
+        }
+        
+        @media (max-width: 360px) {
+            /* Très très petits écrans */
+            .calendar-grid {
+                gap: 3px;
+            }
+            
+            .calendar-day {
+                width: 28px; 
+                height: 28px;
+                font-size: 10px;
+            }
         }
     </style>
 </head>
@@ -814,7 +859,7 @@ def dashboard():
                     <button class="btn btn-warning" onclick="clearSelection()" style="font-size: 12px; padding: 8px 12px;">🗑️ Tout effacer</button>
                 </div>
                 
-                <div id="calendar-grid" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 16px;">
+                <div id="calendar-grid" class="calendar-grid">
                     <!-- Les jours seront générés par JavaScript -->
                 </div>
                 
