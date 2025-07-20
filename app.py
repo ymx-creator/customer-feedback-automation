@@ -21,6 +21,9 @@ app = Flask(__name__)
 # Variable globale pour s'assurer que le scheduler ne démarre qu'une fois
 scheduler_initialized = False
 
+# Variable globale pour éviter les tests simultanés
+test_in_progress = {"status": False, "script": None, "start_time": None}
+
 # Configuration logging
 logging.basicConfig(
     level=logging.INFO,
@@ -90,7 +93,15 @@ def home():
         "monitoring": {
             "health_check": "/health",
             "status": "/status",
-            "last_run": "/last-run"
+            "last_run": "/last-run",
+            "full_monitoring": "/monitoring"
+        },
+        "testing": {
+            "test_standard": "/test/standard",
+            "test_morning": "/test/morning", 
+            "test_night": "/test/night",
+            "test_all": "/test/all",
+            "test_status": "/test/status"
         }
     })
 
@@ -194,6 +205,276 @@ def monitoring():
             "NIGHT": next_night.strftime("%H:%M %d/%m")
         }
     })
+
+@app.route('/test/standard')
+def test_standard():
+    """Test manuel du script standard en production"""
+    global test_in_progress
+    
+    # Vérifier qu'aucun test n'est en cours
+    if test_in_progress["status"]:
+        return jsonify({
+            "status": "error",
+            "message": f"Test déjà en cours: {test_in_progress['script']}",
+            "current_test": test_in_progress
+        }), 409
+    
+    # Marquer le test comme en cours
+    test_in_progress = {
+        "status": True,
+        "script": "standard",
+        "start_time": time.time()
+    }
+    
+    try:
+        logging.info("🧪 ========== TEST MANUEL SCRIPT STANDARD ==========")
+        start_time = time.time()
+        
+        result = run_standard_survey()
+        
+        end_time = time.time()
+        duration = round(end_time - start_time, 2)
+        
+        # Réinitialiser le statut de test
+        test_in_progress = {"status": False, "script": None, "start_time": None}
+        
+        return jsonify({
+            "status": "completed",
+            "script": "standard",
+            "success": result,
+            "duration": duration,
+            "message": "Test standard complété avec succès" if result else "Test standard échoué",
+            "timestamp": datetime.now(pytz.timezone('Europe/Paris')).strftime("%H:%M:%S %d/%m/%Y")
+        })
+        
+    except Exception as e:
+        # Réinitialiser le statut de test en cas d'erreur
+        test_in_progress = {"status": False, "script": None, "start_time": None}
+        
+        return jsonify({
+            "status": "failed",
+            "script": "standard",
+            "success": False,
+            "error": str(e),
+            "message": f"Erreur lors du test standard: {str(e)}"
+        }), 500
+
+@app.route('/test/morning')
+def test_morning():
+    """Test manuel du script morning en production"""
+    global test_in_progress
+    
+    # Vérifier qu'aucun test n'est en cours
+    if test_in_progress["status"]:
+        return jsonify({
+            "status": "error",
+            "message": f"Test déjà en cours: {test_in_progress['script']}",
+            "current_test": test_in_progress
+        }), 409
+    
+    # Marquer le test comme en cours
+    test_in_progress = {
+        "status": True,
+        "script": "morning",
+        "start_time": time.time()
+    }
+    
+    try:
+        logging.info("🧪 ========== TEST MANUEL SCRIPT MORNING ==========")
+        start_time = time.time()
+        
+        result = run_morning_survey()
+        
+        end_time = time.time()
+        duration = round(end_time - start_time, 2)
+        
+        # Réinitialiser le statut de test
+        test_in_progress = {"status": False, "script": None, "start_time": None}
+        
+        return jsonify({
+            "status": "completed",
+            "script": "morning",
+            "success": result,
+            "duration": duration,
+            "message": "Test morning complété avec succès" if result else "Test morning échoué",
+            "timestamp": datetime.now(pytz.timezone('Europe/Paris')).strftime("%H:%M:%S %d/%m/%Y")
+        })
+        
+    except Exception as e:
+        # Réinitialiser le statut de test en cas d'erreur
+        test_in_progress = {"status": False, "script": None, "start_time": None}
+        
+        return jsonify({
+            "status": "failed",
+            "script": "morning",
+            "success": False,
+            "error": str(e),
+            "message": f"Erreur lors du test morning: {str(e)}"
+        }), 500
+
+@app.route('/test/night')
+def test_night():
+    """Test manuel du script night en production"""
+    global test_in_progress
+    
+    # Vérifier qu'aucun test n'est en cours
+    if test_in_progress["status"]:
+        return jsonify({
+            "status": "error",
+            "message": f"Test déjà en cours: {test_in_progress['script']}",
+            "current_test": test_in_progress
+        }), 409
+    
+    # Marquer le test comme en cours
+    test_in_progress = {
+        "status": True,
+        "script": "night",
+        "start_time": time.time()
+    }
+    
+    try:
+        logging.info("🧪 ========== TEST MANUEL SCRIPT NIGHT ==========")
+        start_time = time.time()
+        
+        result = run_night_survey()
+        
+        end_time = time.time()
+        duration = round(end_time - start_time, 2)
+        
+        # Réinitialiser le statut de test
+        test_in_progress = {"status": False, "script": None, "start_time": None}
+        
+        return jsonify({
+            "status": "completed",
+            "script": "night",
+            "success": result,
+            "duration": duration,
+            "message": "Test night complété avec succès" if result else "Test night échoué",
+            "timestamp": datetime.now(pytz.timezone('Europe/Paris')).strftime("%H:%M:%S %d/%m/%Y")
+        })
+        
+    except Exception as e:
+        # Réinitialiser le statut de test en cas d'erreur
+        test_in_progress = {"status": False, "script": None, "start_time": None}
+        
+        return jsonify({
+            "status": "failed",
+            "script": "night",
+            "success": False,
+            "error": str(e),
+            "message": f"Erreur lors du test night: {str(e)}"
+        }), 500
+
+@app.route('/test/all')
+def test_all():
+    """Test manuel de tous les scripts en séquence"""
+    global test_in_progress
+    
+    # Vérifier qu'aucun test n'est en cours
+    if test_in_progress["status"]:
+        return jsonify({
+            "status": "error",
+            "message": f"Test déjà en cours: {test_in_progress['script']}",
+            "current_test": test_in_progress
+        }), 409
+    
+    # Marquer le test comme en cours
+    test_in_progress = {
+        "status": True,
+        "script": "all",
+        "start_time": time.time()
+    }
+    
+    results = {
+        "morning": {"success": False, "duration": 0, "error": None},
+        "standard": {"success": False, "duration": 0, "error": None},
+        "night": {"success": False, "duration": 0, "error": None}
+    }
+    
+    total_start_time = time.time()
+    
+    try:
+        logging.info("🧪 ========== TEST MANUEL - TOUS LES SCRIPTS ==========")
+        
+        # Test Morning
+        logging.info("🌅 Test MORNING en cours...")
+        start_time = time.time()
+        try:
+            results["morning"]["success"] = run_morning_survey()
+            results["morning"]["duration"] = round(time.time() - start_time, 2)
+        except Exception as e:
+            results["morning"]["error"] = str(e)
+            results["morning"]["duration"] = round(time.time() - start_time, 2)
+        
+        # Test Standard
+        logging.info("🍟 Test STANDARD en cours...")
+        start_time = time.time()
+        try:
+            results["standard"]["success"] = run_standard_survey()
+            results["standard"]["duration"] = round(time.time() - start_time, 2)
+        except Exception as e:
+            results["standard"]["error"] = str(e)
+            results["standard"]["duration"] = round(time.time() - start_time, 2)
+        
+        # Test Night
+        logging.info("🌙 Test NIGHT en cours...")
+        start_time = time.time()
+        try:
+            results["night"]["success"] = run_night_survey()
+            results["night"]["duration"] = round(time.time() - start_time, 2)
+        except Exception as e:
+            results["night"]["error"] = str(e)
+            results["night"]["duration"] = round(time.time() - start_time, 2)
+        
+        total_duration = round(time.time() - total_start_time, 2)
+        total_success = sum(1 for r in results.values() if r["success"])
+        
+        # Réinitialiser le statut de test
+        test_in_progress = {"status": False, "script": None, "start_time": None}
+        
+        return jsonify({
+            "status": "completed",
+            "script": "all",
+            "total_duration": total_duration,
+            "success_count": total_success,
+            "total_tests": 3,
+            "success_rate": round((total_success / 3) * 100, 1),
+            "results": results,
+            "message": f"Tests terminés: {total_success}/3 succès",
+            "timestamp": datetime.now(pytz.timezone('Europe/Paris')).strftime("%H:%M:%S %d/%m/%Y")
+        })
+        
+    except Exception as e:
+        # Réinitialiser le statut de test en cas d'erreur
+        test_in_progress = {"status": False, "script": None, "start_time": None}
+        
+        return jsonify({
+            "status": "failed",
+            "script": "all",
+            "success": False,
+            "error": str(e),
+            "results": results,
+            "message": f"Erreur lors des tests: {str(e)}"
+        }), 500
+
+@app.route('/test/status')
+def test_status():
+    """Statut des tests en cours"""
+    global test_in_progress
+    
+    if test_in_progress["status"]:
+        duration = round(time.time() - test_in_progress["start_time"], 2)
+        return jsonify({
+            "test_in_progress": True,
+            "script": test_in_progress["script"],
+            "duration": duration,
+            "start_time": test_in_progress["start_time"]
+        })
+    else:
+        return jsonify({
+            "test_in_progress": False,
+            "message": "Aucun test en cours"
+        })
 
 def run_standard_survey():
     """Exécute le script standard avec retry logic et monitoring"""
