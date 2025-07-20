@@ -97,6 +97,12 @@ current_actions = {
     "can_stop": False     # Si on peut arrêter maintenant
 }
 
+# Configuration du calendrier de planification
+calendar_config = {
+    "enabled": False,     # False = tous les jours, True = jours sélectionnés seulement
+    "selected_days": []   # Liste des jours du mois [1,2,5,10...] quand enabled=True
+}
+
 # Configuration logging
 logging.basicConfig(
     level=logging.INFO,
@@ -164,6 +170,23 @@ def check_stop_requested():
         logging.info("🛑 ARRÊT DEMANDÉ - Interruption en cours...")
         return True
     return False
+
+def should_execute_today():
+    """Vérifie si on doit exécuter les sondages aujourd'hui selon la planification"""
+    global calendar_config
+    
+    # Si le calendrier n'est pas activé, exécuter tous les jours (comportement par défaut)
+    if not calendar_config["enabled"]:
+        return True
+    
+    # Si le calendrier est activé, vérifier si aujourd'hui est dans les jours sélectionnés
+    today = datetime.now().day
+    is_scheduled = today in calendar_config["selected_days"]
+    
+    if not is_scheduled:
+        logging.info(f"📅 Exécution annulée pour aujourd'hui (jour {today}) - Non planifié dans le calendrier")
+    
+    return is_scheduled
 
 @app.route('/')
 def home():
@@ -668,6 +691,28 @@ def dashboard():
         #next-executions li { color: hsl(215, 20%, 65%); margin-bottom: 4px; }
         #last-executions p { color: hsl(215, 20%, 65%); margin-bottom: 4px; }
         
+        /* Styles du calendrier */
+        .calendar-day {
+            width: 40px; height: 40px; border: 1px solid hsl(216, 34%, 17%);
+            background: hsl(224, 71%, 4%); color: hsl(213, 31%, 91%);
+            border-radius: 8px; cursor: pointer; transition: all 0.2s;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 500; font-size: 14px;
+        }
+        .calendar-day:hover {
+            border-color: hsl(262, 83%, 58%);
+            background: hsl(224, 71%, 6%);
+        }
+        .calendar-day.selected {
+            background: hsl(262, 83%, 58%);
+            border-color: hsl(262, 83%, 58%);
+            color: hsl(210, 40%, 98%);
+        }
+        .calendar-day.today {
+            border-color: hsl(142, 76%, 36%);
+            box-shadow: 0 0 0 2px hsl(142, 76%, 36%, 0.3);
+        }
+        
         @media (max-width: 768px) {
             .container { padding: 16px; }
             .status-grid { grid-template-columns: 1fr; }
@@ -749,6 +794,37 @@ def dashboard():
                         <p>Taux</p>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Planification Calendaire -->
+        <div class="card">
+            <h2>📅 Planification Calendaire</h2>
+            <div style="margin-bottom: 16px;">
+                <label style="display: flex; align-items: center; margin-bottom: 12px; cursor: pointer;">
+                    <input type="checkbox" id="calendar-enabled" style="margin-right: 8px; width: 16px; height: 16px;">
+                    <span>Activer la planification personnalisée (sinon exécution quotidienne)</span>
+                </label>
+            </div>
+            
+            <div id="calendar-section" style="display: none;">
+                <div style="margin-bottom: 16px;">
+                    <button class="btn btn-info" onclick="selectWeekdays()" style="margin-right: 8px; font-size: 12px; padding: 8px 12px;">📅 Jours de semaine</button>
+                    <button class="btn btn-info" onclick="selectWeekends()" style="margin-right: 8px; font-size: 12px; padding: 8px 12px;">🎉 Week-ends</button>
+                    <button class="btn btn-warning" onclick="clearSelection()" style="font-size: 12px; padding: 8px 12px;">🗑️ Tout effacer</button>
+                </div>
+                
+                <div id="calendar-grid" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 16px;">
+                    <!-- Les jours seront générés par JavaScript -->
+                </div>
+                
+                <div style="text-align: center;">
+                    <button class="btn btn-success" onclick="saveCalendar()">💾 Sauvegarder la planification</button>
+                </div>
+            </div>
+            
+            <div id="calendar-status" style="margin-top: 16px; padding: 12px; background: hsl(220, 13%, 9%); border-radius: 8px; border: 1px solid hsl(216, 34%, 17%);">
+                Chargement de la configuration...
             </div>
         </div>
     </div>
@@ -894,6 +970,170 @@ def dashboard():
         });
         
         startAutoRefresh();
+        
+        // ========== FONCTIONS CALENDRIER ==========
+        let calendarConfig = { enabled: false, selected_days: [] };
+        
+        function initCalendar() {
+            const grid = document.getElementById('calendar-grid');
+            const today = new Date().getDate();
+            
+            // Créer 31 jours
+            for (let day = 1; day <= 31; day++) {
+                const dayElement = document.createElement('div');
+                dayElement.className = 'calendar-day';
+                dayElement.textContent = day;
+                dayElement.dataset.day = day;
+                
+                if (day === today) {
+                    dayElement.classList.add('today');
+                }
+                
+                dayElement.addEventListener('click', () => toggleDay(day));
+                grid.appendChild(dayElement);
+            }
+            
+            // Charger la configuration
+            loadCalendarConfig();
+        }
+        
+        function toggleDay(day) {
+            const dayElement = document.querySelector(`[data-day="${day}"]`);
+            const index = calendarConfig.selected_days.indexOf(day);
+            
+            if (index > -1) {
+                calendarConfig.selected_days.splice(index, 1);
+                dayElement.classList.remove('selected');
+            } else {
+                calendarConfig.selected_days.push(day);
+                dayElement.classList.add('selected');
+            }
+            
+            updateCalendarStatus();
+        }
+        
+        function selectWeekdays() {
+            // Jours de semaine (approximatif): 1,2,3,4,5,8,9,10,11,12,15,16,17,18,19,22,23,24,25,26,29,30,31
+            const weekdays = [];
+            for (let day = 1; day <= 31; day++) {
+                const date = new Date(2024, 0, day); // Janvier 2024 comme référence
+                const dayOfWeek = date.getDay(); // 0=dimanche, 1=lundi, ..., 6=samedi
+                if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+                    weekdays.push(day);
+                }
+            }
+            
+            calendarConfig.selected_days = [...weekdays];
+            updateCalendarDisplay();
+            updateCalendarStatus();
+        }
+        
+        function selectWeekends() {
+            // Week-ends (approximatif): samedi et dimanche
+            const weekends = [];
+            for (let day = 1; day <= 31; day++) {
+                const date = new Date(2024, 0, day); // Janvier 2024 comme référence
+                const dayOfWeek = date.getDay(); // 0=dimanche, 6=samedi
+                if (dayOfWeek === 0 || dayOfWeek === 6) {
+                    weekends.push(day);
+                }
+            }
+            
+            calendarConfig.selected_days = [...weekends];
+            updateCalendarDisplay();
+            updateCalendarStatus();
+        }
+        
+        function clearSelection() {
+            calendarConfig.selected_days = [];
+            updateCalendarDisplay();
+            updateCalendarStatus();
+        }
+        
+        function updateCalendarDisplay() {
+            // Mettre à jour l'affichage des jours sélectionnés
+            document.querySelectorAll('.calendar-day').forEach(day => {
+                const dayNum = parseInt(day.dataset.day);
+                if (calendarConfig.selected_days.includes(dayNum)) {
+                    day.classList.add('selected');
+                } else {
+                    day.classList.remove('selected');
+                }
+            });
+        }
+        
+        function updateCalendarStatus() {
+            const statusDiv = document.getElementById('calendar-status');
+            const enabled = document.getElementById('calendar-enabled').checked;
+            
+            if (!enabled) {
+                statusDiv.innerHTML = '🟢 <strong>Mode quotidien activé</strong> - Les sondages s\\'exécutent tous les jours automatiquement';
+            } else if (calendarConfig.selected_days.length === 0) {
+                statusDiv.innerHTML = '⚠️ <strong>Aucun jour sélectionné</strong> - Les sondages ne s\\'exécuteront jamais';
+            } else {
+                const sortedDays = [...calendarConfig.selected_days].sort((a, b) => a - b);
+                statusDiv.innerHTML = `🗓️ <strong>Planification personnalisée</strong> - Exécution les jours: ${sortedDays.join(', ')} du mois`;
+            }
+        }
+        
+        function loadCalendarConfig() {
+            fetch('/api/calendar')
+                .then(response => response.json())
+                .then(data => {
+                    calendarConfig = data;
+                    
+                    // Mettre à jour l'interface
+                    document.getElementById('calendar-enabled').checked = data.enabled;
+                    toggleCalendarSection();
+                    updateCalendarDisplay();
+                    updateCalendarStatus();
+                })
+                .catch(error => {
+                    console.error('Erreur de chargement calendrier:', error);
+                    document.getElementById('calendar-status').innerHTML = '❌ Erreur de chargement de la configuration';
+                });
+        }
+        
+        function saveCalendar() {
+            const enabled = document.getElementById('calendar-enabled').checked;
+            const config = {
+                enabled: enabled,
+                selected_days: enabled ? calendarConfig.selected_days : []
+            };
+            
+            fetch('/api/calendar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        alert('✅ Configuration sauvegardée avec succès!');
+                        calendarConfig = config;
+                        updateCalendarStatus();
+                    } else {
+                        alert('❌ Erreur: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erreur de sauvegarde:', error);
+                    alert('❌ Erreur de sauvegarde');
+                });
+        }
+        
+        function toggleCalendarSection() {
+            const enabled = document.getElementById('calendar-enabled').checked;
+            const section = document.getElementById('calendar-section');
+            section.style.display = enabled ? 'block' : 'none';
+            updateCalendarStatus();
+        }
+        
+        // Event listeners pour le calendrier
+        document.getElementById('calendar-enabled').addEventListener('change', toggleCalendarSection);
+        
+        // Initialiser le calendrier au chargement
+        setTimeout(initCalendar, 500);
     </script>
 </body>
 </html>
@@ -968,6 +1208,57 @@ def api_clear():
         "status": "success",
         "message": "Logs et statistiques effacés avec succès."
     })
+
+@app.route('/api/calendar', methods=['GET'])
+@require_auth
+def api_calendar_get():
+    """Récupère la configuration du calendrier"""
+    global calendar_config
+    return jsonify(calendar_config)
+
+@app.route('/api/calendar', methods=['POST'])
+@require_auth
+def api_calendar_post():
+    """Met à jour la configuration du calendrier"""
+    global calendar_config
+    
+    try:
+        data = request.get_json()
+        
+        # Validation des données
+        if 'enabled' not in data:
+            return jsonify({"error": "Le champ 'enabled' est requis"}), 400
+        
+        enabled = bool(data['enabled'])
+        selected_days = data.get('selected_days', [])
+        
+        # Validation des jours sélectionnés
+        if enabled and not selected_days:
+            return jsonify({"error": "Au moins un jour doit être sélectionné en mode calendrier"}), 400
+        
+        if selected_days:
+            # Vérifier que tous les jours sont dans la plage 1-31
+            if not all(isinstance(day, int) and 1 <= day <= 31 for day in selected_days):
+                return jsonify({"error": "Les jours doivent être des entiers entre 1 et 31"}), 400
+        
+        # Mettre à jour la configuration
+        calendar_config["enabled"] = enabled
+        calendar_config["selected_days"] = sorted(list(set(selected_days)))  # Dédoublonner et trier
+        
+        # Log de la modification
+        if enabled:
+            logging.info(f"📅 Calendrier activé : {len(selected_days)} jours sélectionnés {selected_days}")
+        else:
+            logging.info("📅 Calendrier désactivé : mode quotidien rétabli")
+        
+        return jsonify({
+            "status": "success",
+            "message": f"Calendrier {'activé' if enabled else 'désactivé'} avec succès",
+            "config": calendar_config
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Erreur lors de la mise à jour : {str(e)}"}), 500
 
 @app.route('/test/quick/<script>', methods=['POST'])
 @require_auth
@@ -1191,6 +1482,12 @@ def logout():
 def run_standard_survey():
     """Exécute le script standard 10 fois avec pauses aléatoires"""
     global stop_requested
+    
+    # Vérifier si on doit exécuter aujourd'hui selon la planification
+    if not should_execute_today():
+        logging.info("🍟 Session STANDARD annulée : jour non planifié dans le calendrier")
+        return False
+    
     session_start_time = time.time()
     total_success = 0
     total_failed = 0
@@ -1277,6 +1574,12 @@ def run_standard_survey():
 def run_morning_survey():
     """Exécute le script morning 10 fois avec pauses aléatoires"""
     global stop_requested
+    
+    # Vérifier si on doit exécuter aujourd'hui selon la planification
+    if not should_execute_today():
+        logging.info("🌅 Session MORNING annulée : jour non planifié dans le calendrier")
+        return False
+    
     session_start_time = time.time()
     total_success = 0
     total_failed = 0
@@ -1362,6 +1665,12 @@ def run_morning_survey():
 def run_night_survey():
     """Exécute le script night 10 fois avec pauses aléatoires"""
     global stop_requested
+    
+    # Vérifier si on doit exécuter aujourd'hui selon la planification
+    if not should_execute_today():
+        logging.info("🌙 Session NIGHT annulée : jour non planifié dans le calendrier")
+        return False
+    
     session_start_time = time.time()
     total_success = 0
     total_failed = 0
