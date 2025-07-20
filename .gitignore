@@ -1,0 +1,24 @@
+# Environnement virtuel Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Fichiers de développement local
+CLAUDE.md
+scripts/mcdo_morning_automation 2.py
+
+# Logs et données temporaires
+*.log
+*.tmp
+
+# IDE et éditeurs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Système
+.DS_Store
+Thumbs.db
