@@ -1052,67 +1052,85 @@ def login():
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { 
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #333; min-height: 100vh; 
+            background: hsl(224, 71%, 4%);
+            color: hsl(213, 31%, 91%);
+            min-height: 100vh; 
             display: flex; align-items: center; justify-content: center;
         }
         .login-container {
-            background: white; border-radius: 12px; padding: 40px;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
-            max-width: 400px; width: 90%;
+            background: hsl(224, 71%, 4%);
+            border: 1px solid hsl(216, 34%, 17%);
+            border-radius: 12px; 
+            padding: 40px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            max-width: 400px; 
+            width: 90%;
         }
         .header {
             text-align: center; margin-bottom: 30px;
         }
         .header h1 {
-            color: #333; margin-bottom: 10px;
+            color: hsl(213, 31%, 91%);
+            margin-bottom: 8px;
+            font-weight: 600;
         }
         .header p {
-            color: #666; font-size: 0.9em;
+            color: hsl(215, 20%, 65%);
+            font-size: 0.875rem;
         }
         .form-group {
-            margin-bottom: 20px;
-        }
-        .form-group label {
-            display: block; margin-bottom: 8px;
-            font-weight: bold; color: #555;
+            margin-bottom: 24px;
         }
         .form-group input {
-            width: 100%; padding: 12px; border: 2px solid #ddd;
-            border-radius: 8px; font-size: 16px;
-            transition: border-color 0.3s;
+            width: 100%; 
+            padding: 12px 16px; 
+            background: hsl(224, 71%, 4%);
+            border: 1px solid hsl(216, 34%, 17%);
+            border-radius: 8px; 
+            font-size: 16px;
+            color: hsl(213, 31%, 91%);
+            transition: all 0.2s;
+        }
+        .form-group input::placeholder {
+            color: hsl(215, 20%, 65%);
         }
         .form-group input:focus {
-            outline: none; border-color: #667eea;
+            outline: none; 
+            border-color: hsl(262, 83%, 58%);
+            box-shadow: 0 0 0 2px hsl(262, 83%, 58%, 0.2);
         }
         .btn-login {
-            width: 100%; background: #667eea; color: white;
-            border: none; padding: 14px; border-radius: 8px;
-            font-size: 16px; font-weight: bold;
-            cursor: pointer; transition: background 0.3s;
+            width: 100%; 
+            background: hsl(262, 83%, 58%);
+            color: hsl(210, 40%, 98%);
+            border: none; 
+            padding: 12px 16px; 
+            border-radius: 8px;
+            font-size: 16px; 
+            font-weight: 500;
+            cursor: pointer; 
+            transition: all 0.2s;
         }
         .btn-login:hover {
-            background: #5a6fd8;
+            background: hsl(262, 83%, 55%);
+        }
+        .btn-login:active {
+            transform: translateY(0.5px);
         }
         .error-message {
-            background: #f8d7da; color: #721c24;
-            padding: 12px; border-radius: 8px;
-            margin-bottom: 20px; border: 1px solid #f5c6cb;
-        }
-        .security-info {
-            margin-top: 20px; padding: 15px;
-            background: #e7f3ff; border-radius: 8px;
-            border: 1px solid #b3d9ff;
-        }
-        .security-info h4 {
-            color: #0066cc; margin-bottom: 8px;
-        }
-        .security-info ul {
-            color: #004499; font-size: 0.85em;
-            margin-left: 20px;
+            background: hsl(0, 84%, 60%, 0.1);
+            color: hsl(0, 84%, 60%);
+            padding: 12px 16px; 
+            border-radius: 8px;
+            margin-bottom: 20px; 
+            border: 1px solid hsl(0, 84%, 60%, 0.2);
+            font-size: 0.875rem;
         }
         @media (max-width: 768px) {
-            .login-container { padding: 30px 20px; }
+            .login-container { 
+                padding: 32px 24px; 
+                margin: 16px;
+            }
         }
     </style>
 </head>
