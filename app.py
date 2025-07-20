@@ -1136,11 +1136,6 @@ def login():
 </head>
 <body>
     <div class="login-container">
-        <div class="header">
-            <h1>🍟 McDonald's Survey Bot</h1>
-            <p>Authentification requise</p>
-        </div>
-        
         {% if error_message %}
         <div class="error-message">
             {{ error_message }}
@@ -1151,11 +1146,11 @@ def login():
             <div class="form-group">
                 <input type="password" id="password" name="password" 
                        required autocomplete="current-password"
-                       placeholder="Mot de passe">
+                       placeholder="Password">
             </div>
             
             <button type="submit" class="btn-login">
-                🔐 Se connecter
+                GO
             </button>
         </form>
     </div>
