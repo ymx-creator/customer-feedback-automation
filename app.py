@@ -361,6 +361,10 @@ def test_scripts():
     logging.info("🧪 Tests terminés (commentés par défaut)")
 
 if __name__ == "__main__":
+    print("🚀 ========== DÉMARRAGE McDONALD'S SURVEY BOT ==========")
+    print("🐳 Plateforme: Render Free Tier")
+    print("⏰ Timezone: Europe/Paris")
+    print("🔄 Mode: Automatique avec planificateur")
     logging.info("🚀 ========== DÉMARRAGE McDONALD'S SURVEY BOT ==========")
     logging.info("🐳 Plateforme: Render Free Tier")
     logging.info("⏰ Timezone: Europe/Paris")
@@ -374,9 +378,12 @@ if __name__ == "__main__":
     # test_scripts()
     
     # Démarrer le planificateur
+    print("🔄 Démarrage du scheduler...")
     start_scheduler()
+    print("✅ Scheduler démarré")
     
     # Message de démarrage
+    print(f"🌐 Serveur Flask démarrant sur le port {port}")
     logging.info(f"🌐 Serveur Flask démarrant sur le port {port}")
     logging.info("📡 Endpoints disponibles:")
     logging.info("   - / : Informations générales")
