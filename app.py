@@ -1131,25 +1131,15 @@ def login():
         
         <form method="POST">
             <div class="form-group">
-                <label for="password">Mot de passe:</label>
                 <input type="password" id="password" name="password" 
                        required autocomplete="current-password"
-                       placeholder="Entrez votre mot de passe">
+                       placeholder="Mot de passe">
             </div>
             
             <button type="submit" class="btn-login">
                 🔐 Se connecter
             </button>
         </form>
-        
-        <div class="security-info">
-            <h4>🛡️ Sécurité</h4>
-            <ul>
-                <li>Session sécurisée de 4 heures</li>
-                <li>Mot de passe chiffré avec PBKDF2</li>
-                <li>Protection anti-attaques timing</li>
-            </ul>
-        </div>
     </div>
 </body>
 </html>
