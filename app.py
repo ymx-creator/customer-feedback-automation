@@ -18,6 +18,9 @@ from scripts.mcdo_night_automation import automatiser_sondage_mcdo_night
 # Configuration Flask pour éviter le sleep
 app = Flask(__name__)
 
+# Variable globale pour s'assurer que le scheduler ne démarre qu'une fois
+scheduler_initialized = False
+
 # Configuration logging
 logging.basicConfig(
     level=logging.INFO,
@@ -359,6 +362,19 @@ def test_scripts():
     # run_night_survey()
     
     logging.info("🧪 Tests terminés (commentés par défaut)")
+
+# Initialisation automatique du scheduler pour Gunicorn
+def initialize_scheduler_for_gunicorn():
+    """Démarre le scheduler automatiquement même avec Gunicorn"""
+    global scheduler_initialized
+    if not scheduler_initialized:
+        print("🚀 INITIALISATION AUTOMATIQUE DU SCHEDULER (GUNICORN)")
+        start_scheduler()
+        scheduler_initialized = True
+        print("✅ SCHEDULER INITIALISÉ POUR GUNICORN")
+
+# Démarrer automatiquement le scheduler
+initialize_scheduler_for_gunicorn()
 
 if __name__ == "__main__":
     print("🚀 ========== DÉMARRAGE McDONALD'S SURVEY BOT ==========")
