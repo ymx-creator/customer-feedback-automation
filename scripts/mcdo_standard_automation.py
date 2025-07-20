@@ -3,6 +3,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.service import Service
 import time
 import random
 import logging
@@ -53,11 +55,13 @@ def setup_chrome_for_render():
         logging.info("🐳 Environnement Render détecté")
     
     try:
-        driver = webdriver.Chrome(options=options)
-        logging.info("✅ Chrome initialisé avec succès pour Render")
+        # Utiliser webdriver-manager pour télécharger automatiquement la bonne version
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=options)
+        logging.info("✅ Chrome initialisé avec succès via webdriver-manager")
         return driver
     except Exception as e:
-        logging.error(f"❌ Erreur Chrome: {str(e)}")
+        logging.error(f"❌ Impossible d'initialiser Chrome: {str(e)}")
         raise
 
 def automatiser_sondage_mcdo(headless=True, ticket_code=None):
