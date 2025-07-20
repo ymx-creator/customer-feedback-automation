@@ -215,9 +215,9 @@ def repondre_a_la_question(driver, page_num):
     elif "Jour" in page_text and "Heure" in page_text and "Numéro de restaurant" in page_text:
         logging.info("📅 Page: Informations du ticket")
         
-        # 1. Date (1-5 jours avant aujourd'hui)
+        # 1. Date (1-7 jours avant aujourd'hui pour plus de variété)
         today = datetime.datetime.now()
-        days_ago = random.randint(1, 5)
+        days_ago = random.randint(1, 7)
         visit_date = today - datetime.timedelta(days=days_ago)
         date_str = visit_date.strftime("%d/%m/%Y")
         
@@ -225,11 +225,23 @@ def repondre_a_la_question(driver, page_num):
         date_field.send_keys(date_str)
         logging.info(f"📅 Date saisie: {date_str}")
         
-        # 2. Heure (entre 11h30 et 22h)
-        hour = random.randint(11, 22)
+        # 2. Heure réaliste pour standard (déjeuner 12h-14h30 et dîner 18h-21h30)
+        lunch_hours = list(range(12, 15))  # 12h-14h
+        dinner_hours = list(range(18, 22))  # 18h-21h
+        
+        # Choisir aléatoirement entre déjeuner et dîner
+        if random.choice([True, False]):
+            hour = random.choice(lunch_hours)
+        else:
+            hour = random.choice(dinner_hours)
+        
         minutes = random.choice([0, 15, 30, 45])
-        if hour == 11 and minutes < 30:
-            minutes = 30  # S'assurer que si c'est 11h, c'est au moins 11h30
+        
+        # Ajustements spéciaux
+        if hour == 14 and minutes > 30:
+            minutes = 30  # Pas trop tard pour le déjeuner
+        elif hour == 21 and minutes > 30:
+            minutes = 30  # Pas trop tard pour le dîner
         
         # Formater l'heure et les minutes
         hour_str = str(hour).zfill(2)

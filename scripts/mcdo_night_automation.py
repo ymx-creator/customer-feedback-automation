@@ -206,25 +206,27 @@ def repondre_a_la_question(driver, page_num):
     elif "Jour" in page_text and "Heure" in page_text and "Numéro de restaurant" in page_text:
         logging.info("📅 Page: Informations du ticket")
         
-        # 1. Date (jour même à Paris)
-        paris_tz = pytz.timezone('Europe/Paris')
-        today = datetime.datetime.now(paris_tz)
-        date_str = today.strftime("%d/%m/%Y")
+        # 1. Date (1-7 jours avant aujourd'hui pour plus de variété)
+        today = datetime.datetime.now()
+        days_ago = random.randint(1, 7)
+        visit_date = today - datetime.timedelta(days=days_ago)
+        date_str = visit_date.strftime("%d/%m/%Y")
         
         date_field = driver.find_element(By.CSS_SELECTOR, "input[id^='cal_q_mc_q_date']")
         date_field.send_keys(date_str)
-        logging.info(f"📅 Date saisie: {date_str} (jour même à Paris)")
+        logging.info(f"📅 Date saisie: {date_str}")
         
-        # 2. Heure (20-30 minutes avant l'heure actuelle à Paris)
-        paris_tz = pytz.timezone('Europe/Paris')
-        current_time = datetime.datetime.now(paris_tz)
-
-        # Soustraire entre 20 et 30 minutes
-        minutes_before = random.randint(20, 30)
-        order_time = current_time - datetime.timedelta(minutes=minutes_before)
-
-        hour = order_time.hour
-        minutes = order_time.minute
+        # 2. Heure réaliste pour night (dîner tardif/collation 19h-23h)
+        night_hours = list(range(19, 24))  # 19h-23h
+        hour = random.choice(night_hours)
+        minutes = random.choice([0, 15, 30, 45])
+        
+        # Ajustements spéciaux pour le soir
+        if hour == 23 and minutes > 30:
+            minutes = 30  # Pas trop tard non plus
+        if hour == 19 and random.choice([True, False]):
+            # Parfois commencer un peu plus tôt le soir
+            hour = 18
 
         # Formater l'heure et les minutes
         hour_str = str(hour).zfill(2)
@@ -236,8 +238,7 @@ def repondre_a_la_question(driver, page_num):
         minute_field = driver.find_element(By.CSS_SELECTOR, "input[id^='spl_rng_q_mc_q_minute']")
         minute_field.send_keys(minute_str)
 
-        logging.info(f"⏰ Heure actuelle à Paris: {current_time.hour}:{current_time.minute}")
-        logging.info(f"⏰ Heure saisie: {hour_str}:{minute_str} ({minutes_before} minutes avant)")
+        logging.info(f"⏰ Heure saisie: {hour_str}:{minute_str}")
         
         # 3. Numéro de restaurant
         restaurant_field = driver.find_element(By.CSS_SELECTOR, "input[id^='spl_rng_q_mc_q_idrestaurant']")

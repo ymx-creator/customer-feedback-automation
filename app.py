@@ -6,8 +6,9 @@ import threading
 import logging
 import json
 from flask import Flask, jsonify
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
+import random
 from typing import Dict, List
 
 # Importez vos scripts existants
@@ -477,121 +478,163 @@ def test_status():
         })
 
 def run_standard_survey():
-    """Exécute le script standard avec retry logic et monitoring"""
-    max_retries = 2
-    final_success = False
-    final_duration = 0
-    final_error = None
+    """Exécute le script standard 10 fois avec pauses aléatoires"""
+    session_start_time = time.time()
+    total_success = 0
+    total_failed = 0
     
-    for attempt in range(max_retries + 1):
+    logging.info("🍟 ========== SESSION STANDARD : 10 SONDAGES ==========")
+    
+    for loop_num in range(1, 11):
+        logging.info(f"🍟 ========== SONDAGE STANDARD {loop_num}/10 ==========")
+        
         try:
-            logging.info(f"🍟 ========== DÉMARRAGE SCRIPT STANDARD (Tentative {attempt + 1}/{max_retries + 1}) ==========")
             start_time = time.time()
-            
             result = automatiser_sondage_mcdo(headless=True)
-            
-            end_time = time.time()
-            duration = round(end_time - start_time, 2)
-            final_duration = duration
+            duration = round(time.time() - start_time, 2)
             
             if result:
-                logging.info(f"✅ Script STANDARD terminé avec succès en {duration}s")
-                final_success = True
-                log_execution("STANDARD", True, duration)
-                return True
+                total_success += 1
+                logging.info(f"✅ Sondage STANDARD {loop_num}/10 terminé avec succès en {duration}s")
             else:
-                logging.error(f"❌ Script STANDARD échoué après {duration}s")
-                final_error = f"Script failed after {duration}s"
-                if attempt < max_retries:
-                    logging.info(f"🔄 Nouvelle tentative dans 30 secondes...")
-                    time.sleep(30)
-                    continue
+                total_failed += 1
+                logging.error(f"❌ Sondage STANDARD {loop_num}/10 échoué après {duration}s")
                 
         except Exception as e:
-            error_msg = str(e)
-            logging.error(f"❌ Erreur script STANDARD (tentative {attempt + 1}): {error_msg}")
-            final_error = error_msg
-            final_duration = time.time() - start_time if 'start_time' in locals() else 0
-            if attempt < max_retries:
-                logging.info(f"🔄 Nouvelle tentative dans 30 secondes...")
-                time.sleep(30)
-                continue
+            total_failed += 1
+            logging.error(f"❌ Erreur sondage STANDARD {loop_num}/10: {str(e)}")
         
-        logging.info("🍟 ========== FIN SCRIPT STANDARD ==========")
+        # Pause aléatoire entre les sondages (sauf pour le dernier)
+        if loop_num < 10:
+            pause_minutes = random.randint(20, 30)
+            pause_seconds = random.randint(0, 59)
+            total_pause = (pause_minutes * 60) + pause_seconds
+            
+            logging.info(f"⏰ Pause de {pause_minutes}min {pause_seconds}s avant sondage {loop_num + 1}/10")
+            
+            # Calculer l'heure de la prochaine exécution
+            next_time = datetime.now(pytz.timezone('Europe/Paris')) + timedelta(seconds=total_pause)
+            logging.info(f"🕐 Prochain sondage prévu à {next_time.strftime('%H:%M:%S')}")
+            
+            time.sleep(total_pause)
     
-    logging.error("❌ Échec définitif du script STANDARD après toutes les tentatives")
-    log_execution("STANDARD", False, final_duration)
-    return False
+    # Statistiques finales
+    session_duration = round(time.time() - session_start_time, 2)
+    success_rate = round((total_success / 10) * 100, 1) if total_success > 0 else 0
+    
+    logging.info(f"🍟 ========== FIN SESSION STANDARD ==========")
+    logging.info(f"📊 Résultats: {total_success}/10 succès ({success_rate}%)")
+    logging.info(f"⏱️ Durée totale session: {session_duration}s ({round(session_duration/60, 1)} minutes)")
+    
+    # Logger pour les statistiques globales
+    log_execution("STANDARD", total_success > 0, session_duration)
+    return total_success > 0
 
 def run_morning_survey():
-    """Exécute le script morning avec retry logic"""
-    max_retries = 2
-    for attempt in range(max_retries + 1):
+    """Exécute le script morning 10 fois avec pauses aléatoires"""
+    session_start_time = time.time()
+    total_success = 0
+    total_failed = 0
+    
+    logging.info("🌅 ========== SESSION MORNING : 10 SONDAGES ==========")
+    
+    for loop_num in range(1, 11):
+        logging.info(f"🌅 ========== SONDAGE MORNING {loop_num}/10 ==========")
+        
         try:
-            logging.info(f"🌅 ========== DÉMARRAGE SCRIPT MORNING (Tentative {attempt + 1}/{max_retries + 1}) ==========")
             start_time = time.time()
-            
             result = automatiser_sondage_mcdo_morning(headless=True)
-            
-            end_time = time.time()
-            duration = round(end_time - start_time, 2)
+            duration = round(time.time() - start_time, 2)
             
             if result:
-                logging.info(f"✅ Script MORNING terminé avec succès en {duration}s")
-                return True
+                total_success += 1
+                logging.info(f"✅ Sondage MORNING {loop_num}/10 terminé avec succès en {duration}s")
             else:
-                logging.error(f"❌ Script MORNING échoué après {duration}s")
-                if attempt < max_retries:
-                    logging.info(f"🔄 Nouvelle tentative dans 30 secondes...")
-                    time.sleep(30)
-                    continue
+                total_failed += 1
+                logging.error(f"❌ Sondage MORNING {loop_num}/10 échoué après {duration}s")
                 
         except Exception as e:
-            logging.error(f"❌ Erreur script MORNING (tentative {attempt + 1}): {str(e)}")
-            if attempt < max_retries:
-                logging.info(f"🔄 Nouvelle tentative dans 30 secondes...")
-                time.sleep(30)
-                continue
+            total_failed += 1
+            logging.error(f"❌ Erreur sondage MORNING {loop_num}/10: {str(e)}")
         
-        logging.info("🌅 ========== FIN SCRIPT MORNING ==========")
+        # Pause aléatoire entre les sondages (sauf pour le dernier)
+        if loop_num < 10:
+            pause_minutes = random.randint(15, 25)
+            pause_seconds = random.randint(0, 59)
+            total_pause = (pause_minutes * 60) + pause_seconds
+            
+            logging.info(f"⏰ Pause de {pause_minutes}min {pause_seconds}s avant sondage {loop_num + 1}/10")
+            
+            # Calculer l'heure de la prochaine exécution
+            next_time = datetime.now(pytz.timezone('Europe/Paris')) + timedelta(seconds=total_pause)
+            logging.info(f"🕐 Prochain sondage prévu à {next_time.strftime('%H:%M:%S')}")
+            
+            time.sleep(total_pause)
     
-    logging.error("❌ Échec définitif du script MORNING après toutes les tentatives")
-    return False
+    # Statistiques finales
+    session_duration = round(time.time() - session_start_time, 2)
+    success_rate = round((total_success / 10) * 100, 1) if total_success > 0 else 0
+    
+    logging.info(f"🌅 ========== FIN SESSION MORNING ==========")
+    logging.info(f"📊 Résultats: {total_success}/10 succès ({success_rate}%)")
+    logging.info(f"⏱️ Durée totale session: {session_duration}s ({round(session_duration/60, 1)} minutes)")
+    
+    # Logger pour les statistiques globales
+    log_execution("MORNING", total_success > 0, session_duration)
+    return total_success > 0
 
 def run_night_survey():
-    """Exécute le script night avec retry logic"""
-    max_retries = 2
-    for attempt in range(max_retries + 1):
+    """Exécute le script night 10 fois avec pauses aléatoires"""
+    session_start_time = time.time()
+    total_success = 0
+    total_failed = 0
+    
+    logging.info("🌙 ========== SESSION NIGHT : 10 SONDAGES ==========")
+    
+    for loop_num in range(1, 11):
+        logging.info(f"🌙 ========== SONDAGE NIGHT {loop_num}/10 ==========")
+        
         try:
-            logging.info(f"🌙 ========== DÉMARRAGE SCRIPT NIGHT (Tentative {attempt + 1}/{max_retries + 1}) ==========")
             start_time = time.time()
-            
             result = automatiser_sondage_mcdo_night(headless=True)
-            
-            end_time = time.time()
-            duration = round(end_time - start_time, 2)
+            duration = round(time.time() - start_time, 2)
             
             if result:
-                logging.info(f"✅ Script NIGHT terminé avec succès en {duration}s")
-                return True
+                total_success += 1
+                logging.info(f"✅ Sondage NIGHT {loop_num}/10 terminé avec succès en {duration}s")
             else:
-                logging.error(f"❌ Script NIGHT échoué après {duration}s")
-                if attempt < max_retries:
-                    logging.info(f"🔄 Nouvelle tentative dans 30 secondes...")
-                    time.sleep(30)
-                    continue
+                total_failed += 1
+                logging.error(f"❌ Sondage NIGHT {loop_num}/10 échoué après {duration}s")
                 
         except Exception as e:
-            logging.error(f"❌ Erreur script NIGHT (tentative {attempt + 1}): {str(e)}")
-            if attempt < max_retries:
-                logging.info(f"🔄 Nouvelle tentative dans 30 secondes...")
-                time.sleep(30)
-                continue
+            total_failed += 1
+            logging.error(f"❌ Erreur sondage NIGHT {loop_num}/10: {str(e)}")
         
-        logging.info("🌙 ========== FIN SCRIPT NIGHT ==========")
+        # Pause aléatoire entre les sondages (sauf pour le dernier)
+        if loop_num < 10:
+            pause_minutes = random.randint(25, 35)
+            pause_seconds = random.randint(0, 59)
+            total_pause = (pause_minutes * 60) + pause_seconds
+            
+            logging.info(f"⏰ Pause de {pause_minutes}min {pause_seconds}s avant sondage {loop_num + 1}/10")
+            
+            # Calculer l'heure de la prochaine exécution
+            next_time = datetime.now(pytz.timezone('Europe/Paris')) + timedelta(seconds=total_pause)
+            logging.info(f"🕐 Prochain sondage prévu à {next_time.strftime('%H:%M:%S')}")
+            
+            time.sleep(total_pause)
     
-    logging.error("❌ Échec définitif du script NIGHT après toutes les tentatives")
-    return False
+    # Statistiques finales
+    session_duration = round(time.time() - session_start_time, 2)
+    success_rate = round((total_success / 10) * 100, 1) if total_success > 0 else 0
+    
+    logging.info(f"🌙 ========== FIN SESSION NIGHT ==========")
+    logging.info(f"📊 Résultats: {total_success}/10 succès ({success_rate}%)")
+    logging.info(f"⏱️ Durée totale session: {session_duration}s ({round(session_duration/60, 1)} minutes)")
+    
+    # Logger pour les statistiques globales
+    log_execution("NIGHT", total_success > 0, session_duration)
+    return total_success > 0
 
 def schedule_surveys():
     """Programme tous les sondages selon les horaires Paris avec monitoring robuste"""
