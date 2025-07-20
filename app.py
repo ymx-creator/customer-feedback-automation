@@ -604,54 +604,74 @@ def dashboard():
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { 
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #333; min-height: 100vh; padding: 20px;
+            background: hsl(224, 71%, 4%);
+            color: hsl(213, 31%, 91%);
+            min-height: 100vh; padding: 20px;
         }
         .container { max-width: 1200px; margin: 0 auto; }
         .card { 
-            background: white; border-radius: 12px; padding: 20px; 
-            margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            background: hsl(224, 71%, 4%);
+            border: 1px solid hsl(216, 34%, 17%);
+            border-radius: 12px; padding: 20px; 
+            margin-bottom: 20px; 
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
         }
-        .header { text-align: center; color: white; margin-bottom: 30px; }
+        .header { text-align: center; color: hsl(213, 31%, 91%); margin-bottom: 30px; }
+        .header h1 { font-weight: 600; margin-bottom: 8px; }
+        .header p { color: hsl(215, 20%, 65%); font-size: 0.875rem; }
+        
         .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
         .btn { 
-            padding: 12px 24px; border: none; border-radius: 8px; 
-            font-weight: bold; cursor: pointer; transition: all 0.3s;
+            padding: 12px 16px; border: none; border-radius: 8px; 
+            font-weight: 500; cursor: pointer; transition: all 0.2s;
             text-decoration: none; display: inline-block; text-align: center;
+            font-size: 14px;
         }
-        .btn-success { background: #28a745; color: white; }
-        .btn-warning { background: #ffc107; color: #333; }
-        .btn-danger { background: #dc3545; color: white; }
-        .btn-info { background: #17a2b8; color: white; }
-        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
-        .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        .btn-success { background: hsl(142, 76%, 36%); color: hsl(355, 7%, 97%); }
+        .btn-success:hover { background: hsl(142, 76%, 33%); }
+        .btn-warning { background: hsl(48, 96%, 53%); color: hsl(224, 71%, 4%); }
+        .btn-warning:hover { background: hsl(48, 96%, 50%); }
+        .btn-danger { background: hsl(0, 84%, 60%); color: hsl(355, 7%, 97%); }
+        .btn-danger:hover { background: hsl(0, 84%, 57%); }
+        .btn-info { background: hsl(199, 89%, 48%); color: hsl(355, 7%, 97%); }
+        .btn-info:hover { background: hsl(199, 89%, 45%); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
         
         .action-display {
-            background: #f8f9fa; border-left: 4px solid #007bff;
-            padding: 15px; border-radius: 8px; margin: 15px 0;
+            background: hsl(220, 13%, 9%);
+            border: 1px solid hsl(216, 34%, 17%);
+            border-left: 3px solid hsl(262, 83%, 58%);
+            padding: 16px; border-radius: 8px; margin: 16px 0;
         }
         .progress-bar {
-            background: #e9ecef; border-radius: 10px; height: 20px; 
-            overflow: hidden; margin: 10px 0;
+            background: hsl(216, 34%, 17%); border-radius: 10px; height: 8px; 
+            overflow: hidden; margin: 12px 0;
         }
         .progress-fill {
-            background: linear-gradient(90deg, #28a745, #20c997);
+            background: hsl(262, 83%, 58%);
             height: 100%; transition: width 0.5s ease;
         }
         .status-indicator {
-            display: inline-block; width: 12px; height: 12px;
+            display: inline-block; width: 8px; height: 8px;
             border-radius: 50%; margin-right: 8px;
         }
-        .status-online { background: #28a745; }
-        .status-busy { background: #ffc107; }
-        .status-offline { background: #dc3545; }
+        .status-online { background: hsl(142, 76%, 36%); }
+        .status-busy { background: hsl(48, 96%, 53%); }
+        .status-offline { background: hsl(0, 84%, 60%); }
         
         .stats { display: flex; justify-content: space-around; text-align: center; }
-        .stat-item h3 { color: #007bff; font-size: 2em; margin-bottom: 5px; }
+        .stat-item h3 { color: hsl(262, 83%, 58%); font-size: 2em; margin-bottom: 5px; font-weight: 600; }
+        .stat-item p { color: hsl(215, 20%, 65%); font-size: 0.875rem; }
+        
+        h2 { color: hsl(213, 31%, 91%); font-weight: 600; margin-bottom: 16px; font-size: 1.25rem; }
+        
+        #next-executions li { color: hsl(215, 20%, 65%); margin-bottom: 4px; }
+        #last-executions p { color: hsl(215, 20%, 65%); margin-bottom: 4px; }
         
         @media (max-width: 768px) {
-            .container { padding: 10px; }
+            .container { padding: 16px; }
             .status-grid { grid-template-columns: 1fr; }
+            body { padding: 16px; }
         }
     </style>
 </head>
