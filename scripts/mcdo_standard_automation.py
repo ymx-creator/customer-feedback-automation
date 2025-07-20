@@ -56,7 +56,34 @@ def setup_chrome_for_render():
     
     try:
         # Utiliser webdriver-manager pour télécharger automatiquement la bonne version
-        service = Service(ChromeDriverManager().install())
+        driver_path = ChromeDriverManager().install()
+        
+        # Vérifier et corriger le chemin si nécessaire (bug webdriver-manager avec Chrome for Testing)
+        if not os.path.exists(driver_path) or not os.access(driver_path, os.X_OK):
+            # Tenter de trouver le vrai exécutable dans le même répertoire
+            import glob
+            directory = os.path.dirname(driver_path)
+            possible_paths = [
+                os.path.join(directory, "chromedriver"),
+                os.path.join(directory, "chromedriver-linux64", "chromedriver")
+            ]
+            
+            for alt_path in possible_paths:
+                if os.path.exists(alt_path) and os.access(alt_path, os.X_OK):
+                    driver_path = alt_path
+                    logging.info(f"🔧 Chemin ChromeDriver corrigé: {driver_path}")
+                    break
+            else:
+                # Chercher récursivement
+                pattern = os.path.join(directory, "**/chromedriver")
+                found_drivers = glob.glob(pattern, recursive=True)
+                for found_path in found_drivers:
+                    if os.access(found_path, os.X_OK):
+                        driver_path = found_path
+                        logging.info(f"🔧 Chemin ChromeDriver trouvé: {driver_path}")
+                        break
+        
+        service = Service(driver_path)
         driver = webdriver.Chrome(service=service, options=options)
         logging.info("✅ Chrome initialisé avec succès via webdriver-manager")
         return driver
