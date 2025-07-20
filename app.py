@@ -5,10 +5,13 @@ import schedule
 import threading
 import logging
 import json
-from flask import Flask, jsonify, render_template_string
+from flask import Flask, jsonify, render_template_string, request, redirect, session, url_for
 from datetime import datetime, timedelta
 import pytz
 import random
+import hashlib
+import secrets
+from functools import wraps
 from typing import Dict, List
 
 # Importez vos scripts existants
@@ -16,8 +19,65 @@ from scripts.mcdo_standard_automation import automatiser_sondage_mcdo
 from scripts.mcdo_morning_automation import automatiser_sondage_mcdo_morning
 from scripts.mcdo_night_automation import automatiser_sondage_mcdo_night
 
-# Configuration Flask pour éviter le sleep
+# Configuration Flask sécurisée
 app = Flask(__name__)
+
+# Configuration sécurisée pour l'authentification
+app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
+AUTH_PASSWORD_HASH = None
+
+def init_auth():
+    """Initialise le système d'authentification de manière sécurisée"""
+    global AUTH_PASSWORD_HASH
+    
+    # Récupérer le mot de passe depuis les variables d'environnement
+    auth_password = os.environ.get('AUTH_PASSWORD', 'admin123')  # Mot de passe par défaut pour dev
+    
+    # Hasher le mot de passe avec sel pour la sécurité
+    salt = os.environ.get('AUTH_SALT', 'mcdo_bot_2024')
+    AUTH_PASSWORD_HASH = hashlib.pbkdf2_hmac('sha256', 
+                                           auth_password.encode('utf-8'), 
+                                           salt.encode('utf-8'), 
+                                           100000)  # 100k itérations pour la sécurité
+    
+    logging.info("🔐 Système d'authentification initialisé")
+
+# Initialiser l'auth au démarrage
+init_auth()
+
+def verify_password(password):
+    """Vérifie le mot de passe de manière sécurisée"""
+    global AUTH_PASSWORD_HASH
+    if not AUTH_PASSWORD_HASH:
+        return False
+    
+    # Hasher le mot de passe fourni avec le même sel
+    salt = os.environ.get('AUTH_SALT', 'mcdo_bot_2024')
+    provided_hash = hashlib.pbkdf2_hmac('sha256', 
+                                      password.encode('utf-8'), 
+                                      salt.encode('utf-8'), 
+                                      100000)
+    
+    # Comparaison sécurisée pour éviter les attaques par timing
+    return secrets.compare_digest(AUTH_PASSWORD_HASH, provided_hash)
+
+def require_auth(f):
+    """Décorateur pour protéger les routes avec authentification"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Vérifier si l'utilisateur est authentifié
+        if not session.get('authenticated'):
+            # Rediriger vers la page de login
+            return redirect(url_for('login'))
+        
+        # Vérifier l'expiration de la session (4 heures)
+        login_time = session.get('login_time')
+        if not login_time or (time.time() - login_time) > 14400:  # 4 heures = 14400 secondes
+            session.clear()
+            return redirect(url_for('login'))
+        
+        return f(*args, **kwargs)
+    return decorated_function
 
 # Variable globale pour s'assurer que le scheduler ne démarre qu'une fois
 scheduler_initialized = False
@@ -161,6 +221,7 @@ def health_check():
     }), 200
 
 @app.route('/status')
+@require_auth
 def status():
     """Informations détaillées sur le planning"""
     paris_tz = pytz.timezone('Europe/Paris')
@@ -208,6 +269,7 @@ def status():
     })
 
 @app.route('/last-run')
+@require_auth
 def last_run():
     """Informations sur les dernières exécutions"""
     return jsonify({
@@ -217,6 +279,7 @@ def last_run():
     })
 
 @app.route('/monitoring')
+@require_auth
 def monitoring():
     """Endpoint de monitoring simplifié pour Render Free"""
     paris_tz = pytz.timezone('Europe/Paris')
@@ -252,6 +315,7 @@ def monitoring():
     })
 
 @app.route('/test/standard')
+@require_auth
 def test_standard():
     """Test manuel du script standard en production"""
     global test_in_progress
@@ -305,6 +369,7 @@ def test_standard():
         }), 500
 
 @app.route('/test/morning')
+@require_auth
 def test_morning():
     """Test manuel du script morning en production"""
     global test_in_progress
@@ -358,6 +423,7 @@ def test_morning():
         }), 500
 
 @app.route('/test/night')
+@require_auth
 def test_night():
     """Test manuel du script night en production"""
     global test_in_progress
@@ -411,6 +477,7 @@ def test_night():
         }), 500
 
 @app.route('/test/all')
+@require_auth
 def test_all():
     """Test manuel de tous les scripts en séquence"""
     global test_in_progress
@@ -503,6 +570,7 @@ def test_all():
         }), 500
 
 @app.route('/test/status')
+@require_auth
 def test_status():
     """Statut des tests en cours"""
     global test_in_progress
@@ -522,6 +590,7 @@ def test_status():
         })
 
 @app.route('/dashboard')
+@require_auth
 def dashboard():
     """Page de monitoring simple avec contrôles"""
     html_template = '''
@@ -811,6 +880,7 @@ def dashboard():
     return render_template_string(html_template)
 
 @app.route('/api/status')
+@require_auth
 def api_status():
     """API endpoint pour les données du dashboard"""
     paris_tz = pytz.timezone('Europe/Paris')
@@ -844,6 +914,7 @@ def api_status():
     })
 
 @app.route('/api/stop', methods=['POST'])
+@require_auth
 def api_stop():
     """Endpoint pour arrêter les tests en cours"""
     global stop_requested
@@ -857,6 +928,7 @@ def api_stop():
     })
 
 @app.route('/api/clear', methods=['POST'])
+@require_auth
 def api_clear():
     """Endpoint pour effacer les logs et statistiques"""
     global last_executions, global_stats
@@ -877,6 +949,7 @@ def api_clear():
     })
 
 @app.route('/test/quick/<script>', methods=['POST'])
+@require_auth
 def test_quick(script):
     """Test rapide avec un seul sondage"""
     global test_in_progress
@@ -944,6 +1017,145 @@ def test_quick(script):
             "error": str(e),
             "message": f"Erreur lors du test rapide {script}: {str(e)}"
         }), 500
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Page de login sécurisée"""
+    if request.method == 'POST':
+        password = request.form.get('password', '')
+        
+        # Vérification du mot de passe
+        if verify_password(password):
+            # Authentification réussie
+            session['authenticated'] = True
+            session['login_time'] = time.time()
+            session.permanent = True
+            
+            logging.info("🔐 Connexion réussie")
+            return redirect(url_for('dashboard'))
+        else:
+            # Mot de passe incorrect
+            logging.warning("🔐 Tentative de connexion échouée")
+            error_message = "Mot de passe incorrect"
+    else:
+        error_message = None
+    
+    # Afficher la page de login
+    login_template = '''
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔐 McDonald's Bot - Connexion</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333; min-height: 100vh; 
+            display: flex; align-items: center; justify-content: center;
+        }
+        .login-container {
+            background: white; border-radius: 12px; padding: 40px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+            max-width: 400px; width: 90%;
+        }
+        .header {
+            text-align: center; margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #333; margin-bottom: 10px;
+        }
+        .header p {
+            color: #666; font-size: 0.9em;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block; margin-bottom: 8px;
+            font-weight: bold; color: #555;
+        }
+        .form-group input {
+            width: 100%; padding: 12px; border: 2px solid #ddd;
+            border-radius: 8px; font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        .form-group input:focus {
+            outline: none; border-color: #667eea;
+        }
+        .btn-login {
+            width: 100%; background: #667eea; color: white;
+            border: none; padding: 14px; border-radius: 8px;
+            font-size: 16px; font-weight: bold;
+            cursor: pointer; transition: background 0.3s;
+        }
+        .btn-login:hover {
+            background: #5a6fd8;
+        }
+        .error-message {
+            background: #f8d7da; color: #721c24;
+            padding: 12px; border-radius: 8px;
+            margin-bottom: 20px; border: 1px solid #f5c6cb;
+        }
+        .security-info {
+            margin-top: 20px; padding: 15px;
+            background: #e7f3ff; border-radius: 8px;
+            border: 1px solid #b3d9ff;
+        }
+        .security-info h4 {
+            color: #0066cc; margin-bottom: 8px;
+        }
+        .security-info ul {
+            color: #004499; font-size: 0.85em;
+            margin-left: 20px;
+        }
+        @media (max-width: 768px) {
+            .login-container { padding: 30px 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="header">
+            <h1>🍟 McDonald's Survey Bot</h1>
+            <p>Authentification requise</p>
+        </div>
+        
+        {% if error_message %}
+        <div class="error-message">
+            {{ error_message }}
+        </div>
+        {% endif %}
+        
+        <form method="POST">
+            <div class="form-group">
+                <label for="password">Mot de passe:</label>
+                <input type="password" id="password" name="password" 
+                       required autocomplete="current-password"
+                       placeholder="Entrez votre mot de passe">
+            </div>
+            
+            <button type="submit" class="btn-login">
+                🔐 Se connecter
+            </button>
+        </form>
+        
+        <div class="security-info">
+            <h4>🛡️ Sécurité</h4>
+            <ul>
+                <li>Session sécurisée de 4 heures</li>
+                <li>Mot de passe chiffré avec PBKDF2</li>
+                <li>Protection anti-attaques timing</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
+    '''
+    
+    return render_template_string(login_template, error_message=error_message)
 
 def run_standard_survey():
     """Exécute le script standard 10 fois avec pauses aléatoires"""
