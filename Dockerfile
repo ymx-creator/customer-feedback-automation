@@ -34,12 +34,8 @@ RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add
     && apt-get install -y google-chrome-stable \
     && rm -rf /var/lib/apt/lists/*
 
-# Installation de ChromeDriver
-RUN CHROME_DRIVER_VERSION=$(curl -sS chromedriver.storage.googleapis.com/LATEST_RELEASE) \
-    && wget -O /tmp/chromedriver.zip http://chromedriver.storage.googleapis.com/$CHROME_DRIVER_VERSION/chromedriver_linux64.zip \
-    && unzip /tmp/chromedriver.zip chromedriver -d /usr/local/bin/ \
-    && rm /tmp/chromedriver.zip \
-    && chmod +x /usr/local/bin/chromedriver
+# Supprimer l'ancien ChromeDriver s'il existe et laisser webdriver-manager le gérer
+RUN rm -f /usr/local/bin/chromedriver
 
 # Création d'un utilisateur non-root pour la sécurité
 RUN useradd --create-home --shell /bin/bash mcdo-bot
@@ -78,5 +74,5 @@ EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:5000/health || exit 1
 
-# Commande de démarrage DIRECTE (évite les redémarrages Gunicorn)
-CMD ["python", "app.py"]
+# Commande de démarrage avec Gunicorn pour la production
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--timeout", "180", "--worker-class", "sync", "--max-requests", "50", "--max-requests-jitter", "10", "app:app"]

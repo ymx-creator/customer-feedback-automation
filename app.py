@@ -1524,6 +1524,54 @@ def logout():
     logging.info("🔐 Déconnexion effectuée")
     return redirect(url_for('login'))
 
+@app.route('/force/standard')
+@require_auth
+def force_standard():
+    """Force l'exécution immédiate du script standard (pour debug)"""
+    logging.info("🔧 FORCE MANUELLE - Exécution Standard demandée")
+    
+    # Exécuter dans un thread pour ne pas bloquer la requête
+    thread = threading.Thread(target=run_standard_survey, daemon=True)
+    thread.start()
+    
+    return jsonify({
+        "status": "success",
+        "message": "Exécution Standard forcée",
+        "timestamp": datetime.now(pytz.timezone('Europe/Paris')).strftime("%H:%M:%S %d/%m/%Y")
+    })
+
+@app.route('/force/morning')
+@require_auth  
+def force_morning():
+    """Force l'exécution immédiate du script morning (pour debug)"""
+    logging.info("🔧 FORCE MANUELLE - Exécution Morning demandée")
+    
+    # Exécuter dans un thread pour ne pas bloquer la requête
+    thread = threading.Thread(target=run_morning_survey, daemon=True)
+    thread.start()
+    
+    return jsonify({
+        "status": "success",
+        "message": "Exécution Morning forcée", 
+        "timestamp": datetime.now(pytz.timezone('Europe/Paris')).strftime("%H:%M:%S %d/%m/%Y")
+    })
+
+@app.route('/force/night')
+@require_auth
+def force_night():
+    """Force l'exécution immédiate du script night (pour debug)"""
+    logging.info("🔧 FORCE MANUELLE - Exécution Night demandée")
+    
+    # Exécuter dans un thread pour ne pas bloquer la requête
+    thread = threading.Thread(target=run_night_survey, daemon=True)
+    thread.start()
+    
+    return jsonify({
+        "status": "success",
+        "message": "Exécution Night forcée",
+        "timestamp": datetime.now(pytz.timezone('Europe/Paris')).strftime("%H:%M:%S %d/%m/%Y")
+    })
+
 def run_standard_survey():
     """Exécute le script standard 10 fois avec pauses aléatoires"""
     global stop_requested
@@ -1810,18 +1858,47 @@ def schedule_surveys():
     # Script Night : 19h00 Paris = 17h00 UTC
     schedule.every().day.at("17:00").do(run_night_survey)
     
+    # Afficher les heures actuelles pour debug
+    paris_tz = pytz.timezone('Europe/Paris')
+    utc_tz = pytz.timezone('UTC')
+    now_paris = datetime.now(paris_tz)
+    now_utc = datetime.now(utc_tz)
+    
     logging.info("📅 ========== PLANNING CONFIGURÉ ==========")
+    logging.info(f"🕐 Heure actuelle Paris: {now_paris.strftime('%H:%M %d/%m/%Y')}")
+    logging.info(f"🕐 Heure actuelle UTC: {now_utc.strftime('%H:%M %d/%m/%Y')}")
     logging.info("   🍟 Standard: 10:00 UTC (12:00 Paris)")
     logging.info("   🌅 Morning:  08:00 UTC (10:00 Paris)")
     logging.info("   🌙 Night:    17:00 UTC (19:00 Paris)")
+    
+    # Prochaines exécutions
+    for job in schedule.jobs:
+        logging.info(f"⏰ Prochaine {job.job_func.__name__}: {job.next_run}")
+    
     logging.info("📅 =========================================")
     
-    last_heartbeat = time.time()
+    loop_count = 0
     
     # Scheduler optimisé pour Render Free Tier
     while True:
         try:
-            schedule.run_pending()
+            # Log périodique pour confirmer que le scheduler fonctionne
+            loop_count += 1
+            if loop_count % 10 == 0:  # Toutes les 10 minutes
+                current_time = datetime.now(utc_tz)
+                logging.info(f"💓 Scheduler actif - UTC: {current_time.strftime('%H:%M:%S')} - Cycle {loop_count}")
+                
+                # Log des prochaines exécutions
+                for job in schedule.jobs:
+                    time_until = (job.next_run - datetime.now()).total_seconds()
+                    hours_until = time_until / 3600
+                    logging.info(f"⏰ {job.job_func.__name__} dans {hours_until:.1f}h ({job.next_run.strftime('%H:%M %d/%m')})")
+            
+            # Vérifier les jobs en attente
+            pending_jobs = schedule.run_pending()
+            if pending_jobs:
+                logging.info(f"🚀 Exécution de {len(pending_jobs)} job(s) planifié(s)")
+            
             time.sleep(60)  # Vérification simple chaque minute
         except Exception as e:
             logging.error(f"❌ Scheduler error: {str(e)}")
@@ -1855,6 +1932,12 @@ def initialize_scheduler_for_gunicorn():
     global scheduler_initialized
     if not scheduler_initialized:
         print("🚀 INITIALISATION AUTOMATIQUE DU SCHEDULER (GUNICORN)")
+        print(f"🔄 Worker PID: {os.getpid()}")
+        
+        # Vérifier si on doit démarrer le scheduler sur ce worker
+        worker_id = os.environ.get('WORKER_ID', '0')
+        print(f"👷 Worker ID: {worker_id}")
+        
         start_scheduler()
         scheduler_initialized = True
         print("✅ SCHEDULER INITIALISÉ POUR GUNICORN")
