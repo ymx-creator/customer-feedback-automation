@@ -1849,6 +1849,11 @@ def run_night_survey():
 def schedule_surveys():
     """Vérification directe des heures - Plus robuste que schedule"""
     
+    print("📅 ========== SCHEDULER SIMPLIFIÉ DÉMARRÉ ==========")
+    print("   🍟 Standard: 12:00 Paris")
+    print("   🌅 Morning:  10:00 Paris") 
+    print("   🌙 Night:    19:00 Paris")
+    
     logging.info("📅 ========== SCHEDULER SIMPLIFIÉ DÉMARRÉ ==========")
     logging.info("   🍟 Standard: 12:00 Paris")
     logging.info("   🌅 Morning:  10:00 Paris")
@@ -1909,9 +1914,12 @@ def schedule_surveys():
 
 def start_scheduler():
     """Démarre le planificateur en arrière-plan"""
+    print("🔄 DÉMARRAGE DU SCHEDULER THREAD...")
+    logging.info("🔄 DÉMARRAGE DU SCHEDULER THREAD...")
     scheduler_thread = threading.Thread(target=schedule_surveys, daemon=True)
     scheduler_thread.start()
-    logging.info("🔄 Planificateur démarré en arrière-plan")
+    print("✅ SCHEDULER THREAD LANCÉ")
+    logging.info("✅ SCHEDULER THREAD LANCÉ")
 
 def test_scripts():
     """Fonction de test optionnelle pour vérifier que les scripts fonctionnent"""
