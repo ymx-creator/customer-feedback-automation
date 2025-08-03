@@ -1847,59 +1847,62 @@ def run_night_survey():
     return total_success > 0
 
 def schedule_surveys():
-    """Programme tous les sondages selon les horaires Paris avec monitoring robuste"""
+    """Vérification directe des heures - Plus robuste que schedule"""
     
-    # Script Standard : 12h00 Paris = 10h00 UTC
-    schedule.every().day.at("10:00").do(run_standard_survey)
+    logging.info("📅 ========== SCHEDULER SIMPLIFIÉ DÉMARRÉ ==========")
+    logging.info("   🍟 Standard: 12:00 Paris")
+    logging.info("   🌅 Morning:  10:00 Paris")
+    logging.info("   🌙 Night:    19:00 Paris")
     
-    # Script Morning : 10h00 Paris = 08h00 UTC  
-    schedule.every().day.at("08:00").do(run_morning_survey)
+    executed_today = {
+        'standard': False,
+        'morning': False, 
+        'night': False
+    }
     
-    # Script Night : 19h00 Paris = 17h00 UTC
-    schedule.every().day.at("17:00").do(run_night_survey)
+    last_date = datetime.now(pytz.timezone('Europe/Paris')).date()
     
-    # Afficher les heures actuelles pour debug
-    paris_tz = pytz.timezone('Europe/Paris')
-    utc_tz = pytz.timezone('UTC')
-    now_paris = datetime.now(paris_tz)
-    now_utc = datetime.now(utc_tz)
-    
-    logging.info("📅 ========== PLANNING CONFIGURÉ ==========")
-    logging.info(f"🕐 Heure actuelle Paris: {now_paris.strftime('%H:%M %d/%m/%Y')}")
-    logging.info(f"🕐 Heure actuelle UTC: {now_utc.strftime('%H:%M %d/%m/%Y')}")
-    logging.info("   🍟 Standard: 10:00 UTC (12:00 Paris)")
-    logging.info("   🌅 Morning:  08:00 UTC (10:00 Paris)")
-    logging.info("   🌙 Night:    17:00 UTC (19:00 Paris)")
-    
-    # Prochaines exécutions
-    for job in schedule.jobs:
-        logging.info(f"⏰ Prochaine {job.job_func.__name__}: {job.next_run}")
-    
-    logging.info("📅 =========================================")
-    
-    loop_count = 0
-    
-    # Scheduler optimisé pour Render Free Tier
     while True:
         try:
-            # Log périodique pour confirmer que le scheduler fonctionne
-            loop_count += 1
-            if loop_count % 10 == 0:  # Toutes les 10 minutes
-                current_time = datetime.now(utc_tz)
-                logging.info(f"💓 Scheduler actif - UTC: {current_time.strftime('%H:%M:%S')} - Cycle {loop_count}")
-                
-                # Log des prochaines exécutions
-                for job in schedule.jobs:
-                    time_until = (job.next_run - datetime.now()).total_seconds()
-                    hours_until = time_until / 3600
-                    logging.info(f"⏰ {job.job_func.__name__} dans {hours_until:.1f}h ({job.next_run.strftime('%H:%M %d/%m')})")
+            paris_tz = pytz.timezone('Europe/Paris')
+            current_time = datetime.now(paris_tz)
+            current_date = current_time.date()
+            current_hour = current_time.hour
+            current_minute = current_time.minute
             
-            # Vérifier les jobs en attente
-            pending_jobs = schedule.run_pending()
-            if pending_jobs:
-                logging.info(f"🚀 Exécution de {len(pending_jobs)} job(s) planifié(s)")
+            # Reset à minuit
+            if current_date != last_date:
+                executed_today = {'standard': False, 'morning': False, 'night': False}
+                last_date = current_date
+                logging.info(f"🗓️ Nouveau jour - Reset des exécutions: {current_date}")
             
-            time.sleep(60)  # Vérification simple chaque minute
+            # Standard: 12:00 Paris
+            if current_hour == 12 and current_minute == 0 and not executed_today['standard']:
+                logging.info("🍟 DÉCLENCHEMENT Standard - 12:00 Paris")
+                executed_today['standard'] = True
+                thread = threading.Thread(target=run_standard_survey, daemon=True)
+                thread.start()
+            
+            # Morning: 10:00 Paris
+            elif current_hour == 10 and current_minute == 0 and not executed_today['morning']:
+                logging.info("🌅 DÉCLENCHEMENT Morning - 10:00 Paris")
+                executed_today['morning'] = True
+                thread = threading.Thread(target=run_morning_survey, daemon=True)
+                thread.start()
+            
+            # Night: 19:00 Paris
+            elif current_hour == 19 and current_minute == 0 and not executed_today['night']:
+                logging.info("🌙 DÉCLENCHEMENT Night - 19:00 Paris")
+                executed_today['night'] = True
+                thread = threading.Thread(target=run_night_survey, daemon=True)
+                thread.start()
+            
+            # Log de vie toutes les 30 minutes
+            if current_minute % 30 == 0:
+                logging.info(f"💓 Scheduler actif - Paris: {current_time.strftime('%H:%M %d/%m')} - Exécutés: {executed_today}")
+            
+            time.sleep(60)  # Vérification chaque minute
+            
         except Exception as e:
             logging.error(f"❌ Scheduler error: {str(e)}")
             time.sleep(60)
