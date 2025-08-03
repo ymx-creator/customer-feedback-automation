@@ -1881,12 +1881,19 @@ def schedule_surveys():
                 last_date = current_date
                 logging.info(f"🗓️ Nouveau jour - Reset des exécutions: {current_date}")
             
-            # Standard: 12:00 Paris
-            if current_hour == 12 and current_minute == 0 and not executed_today['standard']:
-                logging.info("🍟 DÉCLENCHEMENT Standard - 12:00 Paris")
+            # TEST TEMPORAIRE: Standard à 18:00 Paris (au lieu de 12:00)
+            if current_hour == 18 and current_minute == 0 and not executed_today['standard']:
+                logging.info("🧪 TEST DÉCLENCHEMENT Standard - 18:00 Paris")
                 executed_today['standard'] = True
                 thread = threading.Thread(target=run_standard_survey, daemon=True)
                 thread.start()
+            
+            # Standard: 12:00 Paris (DÉSACTIVÉ POUR TEST)
+            # if current_hour == 12 and current_minute == 0 and not executed_today['standard']:
+            #     logging.info("🍟 DÉCLENCHEMENT Standard - 12:00 Paris")
+            #     executed_today['standard'] = True
+            #     thread = threading.Thread(target=run_standard_survey, daemon=True)
+            #     thread.start()
             
             # Morning: 10:00 Paris
             elif current_hour == 10 and current_minute == 0 and not executed_today['morning']:
