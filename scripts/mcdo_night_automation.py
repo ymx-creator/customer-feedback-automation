@@ -228,14 +228,14 @@ def repondre_a_la_question(driver, page_num):
         date_field.send_keys(date_str)
         logging.info(f"📅 Date saisie: {date_str}")
         
-        # 2. Heure réaliste pour night (dîner tardif/collation 19h-23h)
-        night_hours = list(range(19, 24))  # 19h-23h
+        # 2. Heure réaliste pour night (dîner tardif/collation 19h-22h30)
+        night_hours = list(range(19, 23))  # 19h-22h
         hour = random.choice(night_hours)
         minutes = random.choice([0, 15, 30, 45])
         
         # Ajustements spéciaux pour le soir
-        if hour == 23 and minutes > 30:
-            minutes = 30  # Pas trop tard non plus
+        if hour == 22 and minutes > 30:
+            minutes = 30  # Limite à 22h30 max
         if hour == 19 and random.choice([True, False]):
             # Parfois commencer un peu plus tôt le soir
             hour = 18
