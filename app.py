@@ -1,10 +1,11 @@
-# app.py - Script unifié pour Render
+# app.py - Script optimisé pour serveur Debian low-spec
 import os
 import time
 import schedule
 import threading
 import logging
 import json
+import gc  # Pour la gestion mémoire
 from flask import Flask, jsonify, render_template_string, request, redirect, session, url_for
 from datetime import datetime, timedelta
 import pytz
@@ -19,8 +20,22 @@ from scripts.mcdo_standard_automation import automatiser_sondage_mcdo
 from scripts.mcdo_morning_automation import automatiser_sondage_mcdo_morning
 from scripts.mcdo_night_automation import automatiser_sondage_mcdo_night
 
-# Configuration Flask sécurisée
+# Configuration Flask optimisée pour faible consommation mémoire
 app = Flask(__name__)
+
+# Optimisations mémoire Flask pour serveur 1vCPU/2GB
+app.config.update(
+    # Réduire la taille des données de session
+    MAX_CONTENT_LENGTH=16 * 1024 * 1024,  # 16MB max upload
+    # Optimiser les connexions
+    SEND_FILE_MAX_AGE_DEFAULT=3600,  # Cache statique 1h
+    # Réduire les threads
+    THREADED=False,
+    # Désactiver le mode debug en production
+    DEBUG=False,
+    # Optimiser JSON
+    JSONIFY_PRETTYPRINT_REGULAR=False
+)
 
 # Configuration sécurisée pour l'authentification
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
@@ -1615,6 +1630,9 @@ def run_standard_survey():
             else:
                 total_failed += 1
                 logging.error(f"❌ Sondage STANDARD {loop_num}/10 échoué après {duration}s")
+            
+            # Nettoyage mémoire après chaque sondage
+            gc.collect()
                 
         except Exception as e:
             total_failed += 1
@@ -1662,6 +1680,10 @@ def run_standard_survey():
     
     # Logger pour les statistiques globales
     log_execution("STANDARD", total_success > 0, session_duration)
+    
+    # Nettoyage mémoire final après la session complète
+    gc.collect()
+    
     return total_success > 0
 
 def run_morning_survey():
@@ -1706,6 +1728,9 @@ def run_morning_survey():
             else:
                 total_failed += 1
                 logging.error(f"❌ Sondage MORNING {loop_num}/10 échoué après {duration}s")
+            
+            # Nettoyage mémoire après chaque sondage
+            gc.collect()
                 
         except Exception as e:
             total_failed += 1
@@ -1753,6 +1778,10 @@ def run_morning_survey():
     
     # Logger pour les statistiques globales
     log_execution("MORNING", total_success > 0, session_duration)
+    
+    # Nettoyage mémoire final après la session complète
+    gc.collect()
+    
     return total_success > 0
 
 def run_night_survey():
@@ -1797,6 +1826,9 @@ def run_night_survey():
             else:
                 total_failed += 1
                 logging.error(f"❌ Sondage NIGHT {loop_num}/10 échoué après {duration}s")
+            
+            # Nettoyage mémoire après chaque sondage
+            gc.collect()
                 
         except Exception as e:
             total_failed += 1
@@ -1844,6 +1876,10 @@ def run_night_survey():
     
     # Logger pour les statistiques globales
     log_execution("NIGHT", total_success > 0, session_duration)
+    
+    # Nettoyage mémoire final après la session complète
+    gc.collect()
+    
     return total_success > 0
 
 def schedule_surveys():
@@ -1995,4 +2031,11 @@ if __name__ == "__main__":
     logging.info("   - /last-run : Dernières exécutions")
     
     # Démarrer l'API Flask (obligatoire pour éviter le sleep Render)
-    app.run(host="0.0.0.0", port=port, debug=debug_mode)
+    # Configuration optimisée pour serveur 1vCPU/2GB
+    app.run(
+        host="0.0.0.0", 
+        port=port, 
+        debug=debug_mode,
+        threaded=False,  # Désactiver le multithreading pour économiser la mémoire
+        processes=1      # Un seul processus pour éviter la surcharge
+    )

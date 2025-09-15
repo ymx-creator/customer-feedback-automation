@@ -25,67 +25,61 @@ def config_logging():
         ]
     )
 
-def setup_chrome_for_render():
-    """Configuration Chrome optimisée pour Render"""
+def setup_chrome_for_debian():
+    """Configuration Chrome pure headless pour serveur Debian sans graphics/display"""
     options = webdriver.ChromeOptions()
     
-    # Options obligatoires pour Render
-    options.add_argument("--headless")
+    # Configuration headless pure pour serveur
+    options.add_argument("--headless=new")  # Nouveau mode headless
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
-    options.add_argument("--disable-features=VizDisplayCompositor")
-    options.add_argument("--window-size=1920,1080")
-    # Optimisations mémoire pour Render
-    options.add_argument("--memory-pressure-off")
-    options.add_argument("--disable-background-networking")
+    options.add_argument("--disable-software-rasterizer")
+    
+    # Optimisations serveur headless
+    options.add_argument("--virtual-time-budget=1000")
     options.add_argument("--disable-background-timer-throttling")
-    options.add_argument("--disable-renderer-backgrounding")
     options.add_argument("--disable-backgrounding-occluded-windows")
+    options.add_argument("--disable-renderer-backgrounding")
+    options.add_argument("--disable-features=VizDisplayCompositor,AudioServiceOutOfProcess")
+    options.add_argument("--run-all-compositor-stages-before-draw")
+    options.add_argument("--disable-threaded-animation")
+    options.add_argument("--disable-threaded-scrolling")
+    options.add_argument("--disable-checker-imaging")
+    options.add_argument("--disable-ipc-flooding-protection")
+    
+    # Optimisation mémoire critique
+    options.add_argument("--memory-pressure-off")
+    options.add_argument("--max_old_space_size=512")
+    options.add_argument("--aggressive-cache-discard")
+    options.add_argument("--disable-background-networking")
+    options.add_argument("--disable-default-apps")
+    options.add_argument("--disable-sync")
+    
+    # Désactiver tout le superflu
+    options.add_argument("--disable-images")
+    options.add_argument("--disable-javascript")
+    options.add_argument("--disable-plugins")
+    options.add_argument("--disable-extensions")
+    options.add_argument("--disable-web-security")
     options.add_argument("--disable-client-side-phishing-detection")
     options.add_argument("--disable-component-extensions-with-background-pages")
-    options.add_argument("--disable-default-apps")
     options.add_argument("--disable-hang-monitor")
-    options.add_argument("--disable-ipc-flooding-protection")
-    options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     
-    # Détection environnement Render
-    if os.getenv('RENDER') or os.getenv('PORT'):
-        options.binary_location = "/usr/bin/google-chrome"
-        logging.info("🐳 Environnement Render détecté")
+    # User agent minimal
+    options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36")
+    
+    logging.info("⚡ Configuration Chrome mode headless pur pour serveur Debian")
     
     try:
-        # Utiliser webdriver-manager pour télécharger automatiquement la bonne version
+        # Utiliser webdriver-manager avec cache pour éviter les téléchargements répétés
         driver_path = ChromeDriverManager().install()
-        
-        # Vérifier et corriger le chemin si nécessaire (bug webdriver-manager avec Chrome for Testing)
-        if not os.path.exists(driver_path) or not os.access(driver_path, os.X_OK):
-            # Tenter de trouver le vrai exécutable dans le même répertoire
-            import glob
-            directory = os.path.dirname(driver_path)
-            possible_paths = [
-                os.path.join(directory, "chromedriver"),
-                os.path.join(directory, "chromedriver-linux64", "chromedriver")
-            ]
-            
-            for alt_path in possible_paths:
-                if os.path.exists(alt_path) and os.access(alt_path, os.X_OK):
-                    driver_path = alt_path
-                    logging.info(f"🔧 Chemin ChromeDriver corrigé: {driver_path}")
-                    break
-            else:
-                # Chercher récursivement
-                pattern = os.path.join(directory, "**/chromedriver")
-                found_drivers = glob.glob(pattern, recursive=True)
-                for found_path in found_drivers:
-                    if os.access(found_path, os.X_OK):
-                        driver_path = found_path
-                        logging.info(f"🔧 Chemin ChromeDriver trouvé: {driver_path}")
-                        break
-        
         service = Service(driver_path)
+        # Configurer des timeouts courts pour libérer la mémoire rapidement
         driver = webdriver.Chrome(service=service, options=options)
-        logging.info("✅ Chrome initialisé avec succès via webdriver-manager")
+        driver.set_page_load_timeout(30)  # Timeout court
+        driver.implicitly_wait(5)  # Attente implicite réduite
+        logging.info("✅ Chrome initialisé (mode headless pur)")
         return driver
     except Exception as e:
         logging.error(f"❌ Impossible d'initialiser Chrome: {str(e)}")
@@ -109,7 +103,7 @@ def automatiser_sondage_mcdo(headless=True, ticket_code=None):
     
     try:
         # Utiliser la configuration Render
-        driver = setup_chrome_for_render()
+        driver = setup_chrome_for_debian()
     except Exception as e:
         logging.error(f"❌ Impossible d'initialiser Chrome: {str(e)}")
         return False
@@ -174,7 +168,7 @@ def automatiser_sondage_mcdo(headless=True, ticket_code=None):
                 logging.error(f"❌ Erreur sur la page {page_actuelle}: {str(e)}")
                 break
                 
-        logging.info(f"🎉 Sondage STANDARD complété avec succès : {page_actuelle-1} pages remplies")
+        logging.info(f"🎉 Sondage STANDARD complété avec succès (mode headless pur) : {page_actuelle-1} pages remplies")
         return True
         
     except Exception as e:
@@ -185,6 +179,9 @@ def automatiser_sondage_mcdo(headless=True, ticket_code=None):
         # Fermer le navigateur
         try:
             driver.quit()
+            # Forcer le garbage collection pour lib\u00e9rer la m\u00e9moire
+            import gc
+            gc.collect()
             logging.info("🔒 Navigateur fermé")
         except:
             pass
