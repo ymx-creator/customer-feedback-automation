@@ -277,10 +277,10 @@ def repondre_a_la_question(driver, page_num):
         logging.info("🛒 Page: Où avez-vous passé votre commande")
         radio_buttons = driver.find_elements(By.CSS_SELECTOR, "input[type='radio']")
         
-        # Mode standard: choisir aléatoirement entre en restaurant ou drive
+        # Mode standard: choisir aléatoirement entre borne en restaurant ou comptoir
         option_index = random.randint(0, 1)
         radio_buttons[option_index].click()
-        mode = "En restaurant" if option_index == 0 else "Au drive"
+        mode = "A une borne de commande en restaurant" if option_index == 0 else "Au comptoir"
         logging.info(f"✅ Mode de commande sélectionné: {mode}")
         return
         
