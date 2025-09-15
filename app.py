@@ -1,4 +1,4 @@
-# app.py - Script optimisé pour serveur Debian low-spec
+# app.py - Script optimisé pour serveur Debian low-spec avec logging détaillé
 import os
 import time
 import threading
@@ -8,6 +8,8 @@ from flask import Flask, jsonify
 from datetime import datetime, timedelta
 import pytz
 import random
+import json
+import re
 
 # Importez vos scripts existants
 from scripts.mcdo_standard_automation import automatiser_sondage_mcdo
@@ -37,6 +39,107 @@ active_threads = {
     'morning': None, 
     'night': None
 }
+
+def log_session_details(script_name, start_time, end_time, total_success, total_failed, session_duration):
+    """Enregistrer les détails de session dans un fichier log quotidien"""
+    try:
+        paris_tz = pytz.timezone('Europe/Paris')
+        log_date = datetime.now(paris_tz).strftime('%Y-%m-%d')
+        log_filename = f"logs/mcdo_bot_{log_date}.log"
+        
+        # Créer le dossier logs s'il n'existe pas
+        os.makedirs('logs', exist_ok=True)
+        
+        # Préparer les données de session
+        session_data = {
+            "script": script_name,
+            "date": log_date,
+            "start_time": datetime.fromtimestamp(start_time, paris_tz).strftime('%H:%M:%S'),
+            "end_time": datetime.fromtimestamp(end_time, paris_tz).strftime('%H:%M:%S'),
+            "duration_minutes": round(session_duration / 60, 1),
+            "total_surveys": total_success + total_failed,
+            "successful_surveys": total_success,
+            "failed_surveys": total_failed,
+            "success_rate": round((total_success / (total_success + total_failed)) * 100, 1) if (total_success + total_failed) > 0 else 0,
+            "status": "SUCCESS" if total_success > 0 else "FAILED"
+        }
+        
+        # Écrire dans le fichier log
+        with open(log_filename, 'a', encoding='utf-8') as f:
+            f.write(f"[{datetime.now(paris_tz).strftime('%H:%M:%S')}] SESSION {script_name.upper()}\n")
+            f.write(f"  📅 Date: {log_date}\n")
+            f.write(f"  🕐 Début: {session_data['start_time']} | Fin: {session_data['end_time']} | Durée: {session_data['duration_minutes']}min\n")
+            f.write(f"  📊 Sondages: {session_data['successful_surveys']}/{session_data['total_surveys']} réussis ({session_data['success_rate']}%)\n")
+            f.write(f"  🎯 Statut: {session_data['status']}\n")
+            f.write(f"  📋 Détails JSON: {json.dumps(session_data, ensure_ascii=False)}\n")
+            f.write(f"  {'='*80}\n\n")
+        
+        # Créer aussi un fichier de résumé quotidien
+        create_daily_summary(log_date)
+        
+        logging.info(f"📝 Session {script_name} loggée dans {log_filename}")
+        
+    except Exception as e:
+        logging.error(f"❌ Erreur lors de l'écriture du log: {str(e)}")
+
+def create_daily_summary(log_date):
+    """Créer un résumé quotidien de toutes les sessions"""
+    try:
+        log_filename = f"logs/mcdo_bot_{log_date}.log"
+        summary_filename = f"logs/daily_summary_{log_date}.txt"
+        
+        if not os.path.exists(log_filename):
+            return
+        
+        # Lire le fichier de log et extraire les sessions
+        sessions = []
+        with open(log_filename, 'r', encoding='utf-8') as f:
+            content = f.read()
+            
+        # Extraire les données JSON de chaque session
+        json_matches = re.findall(r'📋 Détails JSON: ({.*?})\n', content)
+        
+        for match in json_matches:
+            try:
+                session_data = json.loads(match)
+                sessions.append(session_data)
+            except:
+                continue
+        
+        # Créer le résumé
+        with open(summary_filename, 'w', encoding='utf-8') as f:
+            f.write(f"📊 RÉSUMÉ QUOTIDIEN - {log_date}\n")
+            f.write(f"{'='*50}\n\n")
+            
+            if not sessions:
+                f.write("❌ Aucune session enregistrée aujourd'hui\n")
+                return
+            
+            total_surveys = sum(s['total_surveys'] for s in sessions)
+            total_success = sum(s['successful_surveys'] for s in sessions)
+            total_failed = sum(s['failed_surveys'] for s in sessions)
+            
+            f.write(f"📈 STATISTIQUES GLOBALES:\n")
+            f.write(f"  • Sessions exécutées: {len(sessions)}\n")
+            f.write(f"  • Total sondages: {total_surveys}\n")
+            f.write(f"  • Sondages réussis: {total_success}\n")
+            f.write(f"  • Sondages échoués: {total_failed}\n")
+            f.write(f"  • Taux de réussite global: {round((total_success/total_surveys)*100, 1) if total_surveys > 0 else 0}%\n\n")
+            
+            f.write(f"📋 DÉTAIL PAR SESSION:\n")
+            for session in sessions:
+                status_icon = "✅" if session['status'] == 'SUCCESS' else "❌"
+                f.write(f"  {status_icon} {session['script'].upper()}: {session['start_time']}-{session['end_time']} | {session['successful_surveys']}/{session['total_surveys']} ({session['success_rate']}%)\n")
+            
+            f.write(f"\n💡 PROCHAINES EXÉCUTIONS PRÉVUES:\n")
+            f.write(f"  🌅 Morning: 10:00\n")
+            f.write(f"  🍟 Standard: 15:00\n")
+            f.write(f"  🌙 Night: 19:00\n")
+        
+        logging.info(f"📋 Résumé quotidien créé: {summary_filename}")
+        
+    except Exception as e:
+        logging.error(f"❌ Erreur lors de la création du résumé: {str(e)}")
 
 def update_execution_stats(script_name, success, duration):
     """Mettre à jour les statistiques d'exécution"""
@@ -69,10 +172,11 @@ def run_standard_survey():
     global active_threads
     active_threads['standard'] = threading.current_thread()
     
+    session_start_time = time.time()
+    
     try:
         logging.info("🍟 ========== DÉBUT SESSION STANDARD ==========")
         
-        session_start_time = time.time()
         total_success = 0
         total_failed = 0
         
@@ -111,11 +215,15 @@ def run_standard_survey():
                 time.sleep(total_pause)
         
         # Statistiques finales
-        session_duration = round(time.time() - session_start_time, 2)
+        session_end_time = time.time()
+        session_duration = round(session_end_time - session_start_time, 2)
         success_rate = round((total_success / 10) * 100, 1) if total_success > 0 else 0
         
         logging.info(f"🍟 ========== FIN SESSION STANDARD ==========")
         logging.info(f"📊 Résultats: {total_success}/10 succès ({success_rate}%) en {session_duration}s")
+        
+        # Logger les détails de la session
+        log_session_details("STANDARD", session_start_time, session_end_time, total_success, total_failed, session_duration)
         
         # Forcer le garbage collection en fin de session
         gc.collect()
@@ -133,10 +241,11 @@ def run_morning_survey():
     global active_threads
     active_threads['morning'] = threading.current_thread()
     
+    session_start_time = time.time()
+    
     try:
         logging.info("🌅 ========== DÉBUT SESSION MORNING ==========")
         
-        session_start_time = time.time()
         total_success = 0
         total_failed = 0
         
@@ -175,11 +284,15 @@ def run_morning_survey():
                 time.sleep(total_pause)
         
         # Statistiques finales
-        session_duration = round(time.time() - session_start_time, 2)
+        session_end_time = time.time()
+        session_duration = round(session_end_time - session_start_time, 2)
         success_rate = round((total_success / 10) * 100, 1) if total_success > 0 else 0
         
         logging.info(f"🌅 ========== FIN SESSION MORNING ==========")
         logging.info(f"📊 Résultats: {total_success}/10 succès ({success_rate}%) en {session_duration}s")
+        
+        # Logger les détails de la session
+        log_session_details("MORNING", session_start_time, session_end_time, total_success, total_failed, session_duration)
         
         # Forcer le garbage collection en fin de session
         gc.collect()
@@ -197,10 +310,11 @@ def run_night_survey():
     global active_threads
     active_threads['night'] = threading.current_thread()
     
+    session_start_time = time.time()
+    
     try:
         logging.info("🌙 ========== DÉBUT SESSION NIGHT ==========")
         
-        session_start_time = time.time()
         total_success = 0
         total_failed = 0
         
@@ -239,11 +353,15 @@ def run_night_survey():
                 time.sleep(total_pause)
         
         # Statistiques finales
-        session_duration = round(time.time() - session_start_time, 2)
+        session_end_time = time.time()
+        session_duration = round(session_end_time - session_start_time, 2)
         success_rate = round((total_success / 10) * 100, 1) if total_success > 0 else 0
         
         logging.info(f"🌙 ========== FIN SESSION NIGHT ==========")
         logging.info(f"📊 Résultats: {total_success}/10 succès ({success_rate}%) en {session_duration}s")
+        
+        # Logger les détails de la session
+        log_session_details("NIGHT", session_start_time, session_end_time, total_success, total_failed, session_duration)
         
         # Forcer le garbage collection en fin de session
         gc.collect()
@@ -264,15 +382,17 @@ def is_thread_active(script_name):
 def schedule_surveys():
     """Scheduler avec protection contre les collisions"""
     
-    print("📅 ========== SCHEDULER ANTI-COLLISION DÉMARRÉ ==========")
+    print("📅 ========== SCHEDULER ANTI-COLLISION + LOGGING DÉMARRÉ ==========")
     print("   🌅 Morning:  10:00 Paris (pauses réduites 10-15min)") 
     print("   🍟 Standard: 15:00 Paris (décalé pour éviter collision)")
     print("   🌙 Night:    19:00 Paris")
+    print("   📝 Logs: dossier ./logs/ (résumés quotidiens)")
     
-    logging.info("📅 ========== SCHEDULER ANTI-COLLISION DÉMARRÉ ==========")
+    logging.info("📅 ========== SCHEDULER ANTI-COLLISION + LOGGING DÉMARRÉ ==========")
     logging.info("   🌅 Morning:  10:00 Paris (pauses réduites 10-15min)")
     logging.info("   🍟 Standard: 15:00 Paris (décalé pour éviter collision)")
     logging.info("   🌙 Night:    19:00 Paris")
+    logging.info("   📝 Logs: dossier ./logs/ (résumés quotidiens)")
     
     executed_today = {
         'standard': False,
