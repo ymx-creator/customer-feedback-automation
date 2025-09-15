@@ -31,6 +31,13 @@ last_executions = {
 }
 global_stats = {"total": 0, "success": 0, "failed": 0}
 
+# Protection contre les collisions de threads
+active_threads = {
+    'standard': None,
+    'morning': None, 
+    'night': None
+}
+
 def update_execution_stats(script_name, success, duration):
     """Mettre à jour les statistiques d'exécution"""
     global global_stats
@@ -48,7 +55,6 @@ def update_execution_stats(script_name, success, duration):
         "duration": round(duration, 1)
     }
 
-
 @app.route('/health')
 def health_check():
     """Health check endpoint pour monitoring externe"""
@@ -60,183 +66,212 @@ def health_check():
 
 def run_standard_survey():
     """Exécuter une session complète de 10 sondages STANDARD"""
-    logging.info("🍟 ========== DÉBUT SESSION STANDARD ==========")
+    global active_threads
+    active_threads['standard'] = threading.current_thread()
     
-    session_start_time = time.time()
-    total_success = 0
-    total_failed = 0
-    
-    for loop_num in range(1, 11):
-        logging.info(f"🍟 ========== SONDAGE STANDARD {loop_num}/10 ==========")
+    try:
+        logging.info("🍟 ========== DÉBUT SESSION STANDARD ==========")
         
-        try:
-            start_time = time.time()
-            result = automatiser_sondage_mcdo(headless=True)
-            duration = round(time.time() - start_time, 2)
+        session_start_time = time.time()
+        total_success = 0
+        total_failed = 0
+        
+        for loop_num in range(1, 11):
+            logging.info(f"🍟 ========== SONDAGE STANDARD {loop_num}/10 ==========")
             
-            if result:
-                total_success += 1
-                logging.info(f"✅ Sondage STANDARD {loop_num}/10 terminé avec succès en {duration}s")
-            else:
-                total_failed += 1
-                logging.error(f"❌ Sondage STANDARD {loop_num}/10 échoué après {duration}s")
-            
-            # Nettoyage mémoire après chaque sondage
-            gc.collect()
+            try:
+                start_time = time.time()
+                result = automatiser_sondage_mcdo(headless=True)
+                duration = round(time.time() - start_time, 2)
                 
-        except Exception as e:
-            total_failed += 1
-            logging.error(f"❌ Erreur sondage STANDARD {loop_num}/10: {str(e)}")
+                if result:
+                    total_success += 1
+                    logging.info(f"✅ Sondage STANDARD {loop_num}/10 terminé avec succès en {duration}s")
+                else:
+                    total_failed += 1
+                    logging.error(f"❌ Sondage STANDARD {loop_num}/10 échoué après {duration}s")
+                
+                # Nettoyage mémoire après chaque sondage
+                gc.collect()
+                    
+            except Exception as e:
+                total_failed += 1
+                logging.error(f"❌ Erreur sondage STANDARD {loop_num}/10: {str(e)}")
+            
+            # Pause aléatoire entre les sondages (sauf pour le dernier)
+            if loop_num < 10:
+                pause_minutes = random.randint(20, 30)
+                pause_seconds = random.randint(0, 59)
+                total_pause = (pause_minutes * 60) + pause_seconds
+                
+                next_time = datetime.now(pytz.timezone('Europe/Paris')) + timedelta(seconds=total_pause)
+                logging.info(f"⏰ Pause de {pause_minutes}min {pause_seconds}s avant sondage {loop_num + 1}/10")
+                logging.info(f"🕐 Prochain sondage prévu à {next_time.strftime('%H:%M:%S')}")
+                
+                time.sleep(total_pause)
         
-        # Pause aléatoire entre les sondages (sauf pour le dernier)
-        if loop_num < 10:
-            pause_minutes = random.randint(20, 30)
-            pause_seconds = random.randint(0, 59)
-            total_pause = (pause_minutes * 60) + pause_seconds
-            
-            next_time = datetime.now(pytz.timezone('Europe/Paris')) + timedelta(seconds=total_pause)
-            logging.info(f"⏰ Pause de {pause_minutes}min {pause_seconds}s avant sondage {loop_num + 1}/10")
-            logging.info(f"🕐 Prochain sondage prévu à {next_time.strftime('%H:%M:%S')}")
-            
-            time.sleep(total_pause)
+        # Statistiques finales
+        session_duration = round(time.time() - session_start_time, 2)
+        success_rate = round((total_success / 10) * 100, 1) if total_success > 0 else 0
+        
+        logging.info(f"🍟 ========== FIN SESSION STANDARD ==========")
+        logging.info(f"📊 Résultats: {total_success}/10 succès ({success_rate}%) en {session_duration}s")
+        
+        # Forcer le garbage collection en fin de session
+        gc.collect()
+        
+        # Mettre à jour les statistiques
+        update_execution_stats("STANDARD", total_success > 0, session_duration)
+        return total_success > 0
     
-    # Statistiques finales
-    session_duration = round(time.time() - session_start_time, 2)
-    success_rate = round((total_success / 10) * 100, 1) if total_success > 0 else 0
-    
-    logging.info(f"🍟 ========== FIN SESSION STANDARD ==========")
-    logging.info(f"📊 Résultats: {total_success}/10 succès ({success_rate}%) en {session_duration}s")
-    
-    # Forcer le garbage collection en fin de session
-    gc.collect()
-    
-    # Mettre à jour les statistiques
-    update_execution_stats("STANDARD", total_success > 0, session_duration)
-    return total_success > 0
+    finally:
+        # Nettoyer le thread actif
+        active_threads['standard'] = None
 
 def run_morning_survey():
     """Exécuter une session complète de 10 sondages MORNING"""
-    logging.info("🌅 ========== DÉBUT SESSION MORNING ==========")
+    global active_threads
+    active_threads['morning'] = threading.current_thread()
     
-    session_start_time = time.time()
-    total_success = 0
-    total_failed = 0
-    
-    for loop_num in range(1, 11):
-        logging.info(f"🌅 ========== SONDAGE MORNING {loop_num}/10 ==========")
+    try:
+        logging.info("🌅 ========== DÉBUT SESSION MORNING ==========")
         
-        try:
-            start_time = time.time()
-            result = automatiser_sondage_mcdo_morning(headless=True)
-            duration = round(time.time() - start_time, 2)
+        session_start_time = time.time()
+        total_success = 0
+        total_failed = 0
+        
+        for loop_num in range(1, 11):
+            logging.info(f"🌅 ========== SONDAGE MORNING {loop_num}/10 ==========")
             
-            if result:
-                total_success += 1
-                logging.info(f"✅ Sondage MORNING {loop_num}/10 terminé avec succès en {duration}s")
-            else:
-                total_failed += 1
-                logging.error(f"❌ Sondage MORNING {loop_num}/10 échoué après {duration}s")
-            
-            # Nettoyage mémoire après chaque sondage
-            gc.collect()
+            try:
+                start_time = time.time()
+                result = automatiser_sondage_mcdo_morning(headless=True)
+                duration = round(time.time() - start_time, 2)
                 
-        except Exception as e:
-            total_failed += 1
-            logging.error(f"❌ Erreur sondage MORNING {loop_num}/10: {str(e)}")
+                if result:
+                    total_success += 1
+                    logging.info(f"✅ Sondage MORNING {loop_num}/10 terminé avec succès en {duration}s")
+                else:
+                    total_failed += 1
+                    logging.error(f"❌ Sondage MORNING {loop_num}/10 échoué après {duration}s")
+                
+                # Nettoyage mémoire après chaque sondage
+                gc.collect()
+                    
+            except Exception as e:
+                total_failed += 1
+                logging.error(f"❌ Erreur sondage MORNING {loop_num}/10: {str(e)}")
+            
+            # Pause aléatoire entre les sondages - RÉDUITE (sauf pour le dernier)
+            if loop_num < 10:
+                pause_minutes = random.randint(10, 15)  # Réduit de 15-25 à 10-15
+                pause_seconds = random.randint(0, 59)
+                total_pause = (pause_minutes * 60) + pause_seconds
+                
+                next_time = datetime.now(pytz.timezone('Europe/Paris')) + timedelta(seconds=total_pause)
+                logging.info(f"⏰ Pause de {pause_minutes}min {pause_seconds}s avant sondage {loop_num + 1}/10")
+                logging.info(f"🕐 Prochain sondage prévu à {next_time.strftime('%H:%M:%S')}")
+                
+                time.sleep(total_pause)
         
-        # Pause aléatoire entre les sondages (sauf pour le dernier)
-        if loop_num < 10:
-            pause_minutes = random.randint(15, 25)
-            pause_seconds = random.randint(0, 59)
-            total_pause = (pause_minutes * 60) + pause_seconds
-            
-            next_time = datetime.now(pytz.timezone('Europe/Paris')) + timedelta(seconds=total_pause)
-            logging.info(f"⏰ Pause de {pause_minutes}min {pause_seconds}s avant sondage {loop_num + 1}/10")
-            logging.info(f"🕐 Prochain sondage prévu à {next_time.strftime('%H:%M:%S')}")
-            
-            time.sleep(total_pause)
+        # Statistiques finales
+        session_duration = round(time.time() - session_start_time, 2)
+        success_rate = round((total_success / 10) * 100, 1) if total_success > 0 else 0
+        
+        logging.info(f"🌅 ========== FIN SESSION MORNING ==========")
+        logging.info(f"📊 Résultats: {total_success}/10 succès ({success_rate}%) en {session_duration}s")
+        
+        # Forcer le garbage collection en fin de session
+        gc.collect()
+        
+        # Mettre à jour les statistiques
+        update_execution_stats("MORNING", total_success > 0, session_duration)
+        return total_success > 0
     
-    # Statistiques finales
-    session_duration = round(time.time() - session_start_time, 2)
-    success_rate = round((total_success / 10) * 100, 1) if total_success > 0 else 0
-    
-    logging.info(f"🌅 ========== FIN SESSION MORNING ==========")
-    logging.info(f"📊 Résultats: {total_success}/10 succès ({success_rate}%) en {session_duration}s")
-    
-    # Forcer le garbage collection en fin de session
-    gc.collect()
-    
-    # Mettre à jour les statistiques
-    update_execution_stats("MORNING", total_success > 0, session_duration)
-    return total_success > 0
+    finally:
+        # Nettoyer le thread actif
+        active_threads['morning'] = None
 
 def run_night_survey():
     """Exécuter une session complète de 10 sondages NIGHT"""
-    logging.info("🌙 ========== DÉBUT SESSION NIGHT ==========")
+    global active_threads
+    active_threads['night'] = threading.current_thread()
     
-    session_start_time = time.time()
-    total_success = 0
-    total_failed = 0
-    
-    for loop_num in range(1, 11):
-        logging.info(f"🌙 ========== SONDAGE NIGHT {loop_num}/10 ==========")
+    try:
+        logging.info("🌙 ========== DÉBUT SESSION NIGHT ==========")
         
-        try:
-            start_time = time.time()
-            result = automatiser_sondage_mcdo_night(headless=True)
-            duration = round(time.time() - start_time, 2)
+        session_start_time = time.time()
+        total_success = 0
+        total_failed = 0
+        
+        for loop_num in range(1, 11):
+            logging.info(f"🌙 ========== SONDAGE NIGHT {loop_num}/10 ==========")
             
-            if result:
-                total_success += 1
-                logging.info(f"✅ Sondage NIGHT {loop_num}/10 terminé avec succès en {duration}s")
-            else:
-                total_failed += 1
-                logging.error(f"❌ Sondage NIGHT {loop_num}/10 échoué après {duration}s")
-            
-            # Nettoyage mémoire après chaque sondage
-            gc.collect()
+            try:
+                start_time = time.time()
+                result = automatiser_sondage_mcdo_night(headless=True)
+                duration = round(time.time() - start_time, 2)
                 
-        except Exception as e:
-            total_failed += 1
-            logging.error(f"❌ Erreur sondage NIGHT {loop_num}/10: {str(e)}")
+                if result:
+                    total_success += 1
+                    logging.info(f"✅ Sondage NIGHT {loop_num}/10 terminé avec succès en {duration}s")
+                else:
+                    total_failed += 1
+                    logging.error(f"❌ Sondage NIGHT {loop_num}/10 échoué après {duration}s")
+                
+                # Nettoyage mémoire après chaque sondage
+                gc.collect()
+                    
+            except Exception as e:
+                total_failed += 1
+                logging.error(f"❌ Erreur sondage NIGHT {loop_num}/10: {str(e)}")
+            
+            # Pause aléatoire entre les sondages (sauf pour le dernier)
+            if loop_num < 10:
+                pause_minutes = random.randint(25, 35)
+                pause_seconds = random.randint(0, 59)
+                total_pause = (pause_minutes * 60) + pause_seconds
+                
+                next_time = datetime.now(pytz.timezone('Europe/Paris')) + timedelta(seconds=total_pause)
+                logging.info(f"⏰ Pause de {pause_minutes}min {pause_seconds}s avant sondage {loop_num + 1}/10")
+                logging.info(f"🕐 Prochain sondage prévu à {next_time.strftime('%H:%M:%S')}")
+                
+                time.sleep(total_pause)
         
-        # Pause aléatoire entre les sondages (sauf pour le dernier)
-        if loop_num < 10:
-            pause_minutes = random.randint(25, 35)
-            pause_seconds = random.randint(0, 59)
-            total_pause = (pause_minutes * 60) + pause_seconds
-            
-            next_time = datetime.now(pytz.timezone('Europe/Paris')) + timedelta(seconds=total_pause)
-            logging.info(f"⏰ Pause de {pause_minutes}min {pause_seconds}s avant sondage {loop_num + 1}/10")
-            logging.info(f"🕐 Prochain sondage prévu à {next_time.strftime('%H:%M:%S')}")
-            
-            time.sleep(total_pause)
+        # Statistiques finales
+        session_duration = round(time.time() - session_start_time, 2)
+        success_rate = round((total_success / 10) * 100, 1) if total_success > 0 else 0
+        
+        logging.info(f"🌙 ========== FIN SESSION NIGHT ==========")
+        logging.info(f"📊 Résultats: {total_success}/10 succès ({success_rate}%) en {session_duration}s")
+        
+        # Forcer le garbage collection en fin de session
+        gc.collect()
+        
+        # Mettre à jour les statistiques
+        update_execution_stats("NIGHT", total_success > 0, session_duration)
+        return total_success > 0
     
-    # Statistiques finales
-    session_duration = round(time.time() - session_start_time, 2)
-    success_rate = round((total_success / 10) * 100, 1) if total_success > 0 else 0
-    
-    logging.info(f"🌙 ========== FIN SESSION NIGHT ==========")
-    logging.info(f"📊 Résultats: {total_success}/10 succès ({success_rate}%) en {session_duration}s")
-    
-    # Forcer le garbage collection en fin de session
-    gc.collect()
-    
-    # Mettre à jour les statistiques
-    update_execution_stats("NIGHT", total_success > 0, session_duration)
-    return total_success > 0
+    finally:
+        # Nettoyer le thread actif
+        active_threads['night'] = None
+
+def is_thread_active(script_name):
+    """Vérifier si un thread est encore actif"""
+    thread = active_threads.get(script_name)
+    return thread is not None and thread.is_alive()
 
 def schedule_surveys():
-    """Vérification directe des heures - Simple et robuste"""
+    """Scheduler avec protection contre les collisions"""
     
-    print("📅 ========== SCHEDULER DÉMARRÉ ==========")
-    print("   🌅 Morning:  10:00 Paris") 
-    print("   🍟 Standard: 12:00 Paris")
+    print("📅 ========== SCHEDULER ANTI-COLLISION DÉMARRÉ ==========")
+    print("   🌅 Morning:  10:00 Paris (pauses réduites 10-15min)") 
+    print("   🍟 Standard: 15:00 Paris (décalé pour éviter collision)")
     print("   🌙 Night:    19:00 Paris")
     
-    logging.info("📅 ========== SCHEDULER DÉMARRÉ ==========")
-    logging.info("   🌅 Morning:  10:00 Paris")
-    logging.info("   🍟 Standard: 12:00 Paris")
+    logging.info("📅 ========== SCHEDULER ANTI-COLLISION DÉMARRÉ ==========")
+    logging.info("   🌅 Morning:  10:00 Paris (pauses réduites 10-15min)")
+    logging.info("   🍟 Standard: 15:00 Paris (décalé pour éviter collision)")
     logging.info("   🌙 Night:    19:00 Paris")
     
     executed_today = {
@@ -261,26 +296,38 @@ def schedule_surveys():
                 last_date = current_date
                 logging.info(f"🗓️ Nouveau jour - Reset des exécutions: {current_date}")
             
-            # Standard: 12:00 Paris
-            if current_hour == 12 and current_minute == 0 and not executed_today['standard']:
-                logging.info("🍟 DÉCLENCHEMENT Standard - 12:00 Paris")
-                executed_today['standard'] = True
-                thread = threading.Thread(target=run_standard_survey, daemon=True)
-                thread.start()
-            
             # Morning: 10:00 Paris
-            elif current_hour == 10 and current_minute == 0 and not executed_today['morning']:
+            if (current_hour == 10 and current_minute == 0 and 
+                not executed_today['morning'] and 
+                not is_thread_active('morning')):
                 logging.info("🌅 DÉCLENCHEMENT Morning - 10:00 Paris")
                 executed_today['morning'] = True
                 thread = threading.Thread(target=run_morning_survey, daemon=True)
                 thread.start()
             
+            # Standard: 15:00 Paris (décalé pour éviter collision avec Morning)
+            elif (current_hour == 15 and current_minute == 0 and 
+                  not executed_today['standard'] and 
+                  not is_thread_active('standard')):
+                logging.info("🍟 DÉCLENCHEMENT Standard - 15:00 Paris")
+                executed_today['standard'] = True
+                thread = threading.Thread(target=run_standard_survey, daemon=True)
+                thread.start()
+            
             # Night: 19:00 Paris
-            elif current_hour == 19 and current_minute == 0 and not executed_today['night']:
+            elif (current_hour == 19 and current_minute == 0 and 
+                  not executed_today['night'] and 
+                  not is_thread_active('night')):
                 logging.info("🌙 DÉCLENCHEMENT Night - 19:00 Paris")
                 executed_today['night'] = True
                 thread = threading.Thread(target=run_night_survey, daemon=True)
                 thread.start()
+            
+            # Vérification des collisions (optionnel - pour monitoring)
+            active_count = sum(1 for name in ['standard', 'morning', 'night'] if is_thread_active(name))
+            if active_count > 1:
+                active_scripts = [name for name in ['standard', 'morning', 'night'] if is_thread_active(name)]
+                logging.warning(f"⚠️ {active_count} scripts actifs simultanément: {active_scripts}")
             
             # Pause de 60 secondes entre les vérifications
             time.sleep(60)
