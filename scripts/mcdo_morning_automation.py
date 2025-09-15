@@ -24,18 +24,20 @@ def config_logging():
     )
 
 def setup_chrome_for_debian():
-    """Configuration Chrome pure headless pour serveur Debian sans graphics/display"""
+    """Configuration Chrome conservative pour serveur Debian avec DevTools stable"""
     options = webdriver.ChromeOptions()
     
-    # Configuration headless pure pour serveur
-    options.add_argument("--headless=new")  # Nouveau mode headless
+    # Configuration headless conservative - retour à l'ancien mode headless
+    options.add_argument("--headless")  # Mode headless classique (plus stable)
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
     options.add_argument("--disable-software-rasterizer")
     
+    # Taille de fenêtre explicite (nécessaire même en headless)
+    options.add_argument("--window-size=1280,720")
+    
     # Optimisations serveur headless
-    # options.add_argument("--virtual-time-budget=1000")  # Commented out - causes window closing issues
     options.add_argument("--disable-background-timer-throttling")
     options.add_argument("--disable-backgrounding-occluded-windows")
     options.add_argument("--disable-renderer-backgrounding")
@@ -46,13 +48,12 @@ def setup_chrome_for_debian():
     options.add_argument("--disable-checker-imaging")
     options.add_argument("--disable-ipc-flooding-protection")
     
-    # Chrome stability options for headless mode on servers
-    options.add_argument("--remote-debugging-port=0")
+    # Chrome stability options - configuration DevTools stable
+    options.add_argument("--remote-debugging-port=9222")  # Port fixe pour DevTools
     options.add_argument("--disable-web-security")
     options.add_argument("--allow-running-insecure-content")
     options.add_argument("--disable-extensions-file-access-check")
-    options.add_argument("--single-process")  # Critical for low memory servers
-    options.add_argument("--disable-zygote")  # Prevents process forking issues
+    # Suppression de --single-process et --disable-zygote (peuvent causer des problèmes DevTools)
     options.add_argument("--disable-crash-reporter")
     options.add_argument("--disable-logging")
     options.add_argument("--log-level=3")
@@ -65,6 +66,8 @@ def setup_chrome_for_debian():
     options.add_argument("--disable-background-networking")
     options.add_argument("--disable-default-apps")
     options.add_argument("--disable-sync")
+    options.add_argument("--no-first-run")
+    options.add_argument("--disable-popup-blocking")
     
     # Désactiver tout le superflu
     options.add_argument("--disable-images")
@@ -79,7 +82,7 @@ def setup_chrome_for_debian():
     # User agent minimal
     options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36")
     
-    logging.info("⚡ Configuration Chrome mode headless pur pour serveur Debian")
+    logging.info("⚡ Configuration Chrome conservative avec DevTools stable pour serveur Debian")
     
     try:
         # Utiliser webdriver-manager avec cache pour éviter les téléchargements répétés
