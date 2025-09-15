@@ -37,7 +37,7 @@ def setup_chrome_for_debian():
     options.add_argument("--disable-software-rasterizer")
     
     # Optimisations serveur headless
-    options.add_argument("--virtual-time-budget=1000")
+    # options.add_argument("--virtual-time-budget=1000")  # Commented out - causes window closing issues
     options.add_argument("--disable-background-timer-throttling")
     options.add_argument("--disable-backgrounding-occluded-windows")
     options.add_argument("--disable-renderer-backgrounding")
@@ -47,6 +47,18 @@ def setup_chrome_for_debian():
     options.add_argument("--disable-threaded-scrolling")
     options.add_argument("--disable-checker-imaging")
     options.add_argument("--disable-ipc-flooding-protection")
+    
+    # Chrome stability options for headless mode on servers
+    options.add_argument("--remote-debugging-port=0")
+    options.add_argument("--disable-web-security")
+    options.add_argument("--allow-running-insecure-content")
+    options.add_argument("--disable-extensions-file-access-check")
+    options.add_argument("--single-process")  # Critical for low memory servers
+    options.add_argument("--disable-zygote")  # Prevents process forking issues
+    options.add_argument("--disable-crash-reporter")
+    options.add_argument("--disable-logging")
+    options.add_argument("--log-level=3")
+    options.add_argument("--silent")
     
     # Optimisation mémoire critique
     options.add_argument("--memory-pressure-off")
