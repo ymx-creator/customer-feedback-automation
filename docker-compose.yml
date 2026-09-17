@@ -10,6 +10,7 @@ services:
       AUTH_PASSWORD: ${AUTH_PASSWORD:?Set AUTH_PASSWORD in Dokploy}
       AUTH_SALT: ${AUTH_SALT:?Set AUTH_SALT in Dokploy}
       SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in Dokploy}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
     command:
       [
         'gunicorn',
@@ -25,6 +26,8 @@ services:
         '-',
         'app:app',
       ]
+    ports:
+      - '127.0.0.1:5000:5000'
     shm_size: 1gb
     init: true
     read_only: true

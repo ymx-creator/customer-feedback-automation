@@ -29,7 +29,17 @@ docker compose ps
 docker compose logs -f
 ```
 
-Le Compose ne publie aucun port vers l'hôte. Le service `web` écoute uniquement sur le réseau Docker pour le health check interne de Dokploy. Les logs du service `scheduler` contiennent les récapitulatifs `[SCHEDULER_RECAP]` et `[DAILY_RECAP]`. Les logs HTTP sont visibles séparément dans le service `web`.
+Le service `web` est publié uniquement sur `127.0.0.1:5000` du serveur Dokploy, jamais sur Internet. Il est donc accessible avec un tunnel SSH, mais pas directement depuis l'extérieur. Les logs du service `scheduler` contiennent les récapitulatifs `[SCHEDULER_RECAP]` et `[DAILY_RECAP]`. Les logs HTTP sont visibles séparément dans le service `web`.
+
+### Accès privé par tunnel SSH
+
+Depuis votre ordinateur :
+
+```bash
+ssh -N -L 5000:127.0.0.1:5000 utilisateur@serveur-dokploy
+```
+
+Puis ouvrir `http://localhost:5000/login`. Le terminal SSH doit rester ouvert. Le tunnel est chiffré et le port Docker reste inaccessible depuis Internet. Avec un reverse proxy HTTPS Dokploy à la place, définir `SESSION_COOKIE_SECURE=true`.
 
 ### Dokploy
 
