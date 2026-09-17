@@ -3,14 +3,17 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
+from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
 import time
 import random
 import logging
 import datetime
 import argparse
-import pytz
 import os
+
+# Variables globales
+eatIn = None
 
 def config_logging():
     """Configure le système de journalisation"""
@@ -22,48 +25,65 @@ def config_logging():
         ]
     )
 
-def setup_chrome_for_render():
-    """Configuration Chrome optimisée pour Render"""
+def setup_chrome_for_debian():
+    """Configuration Chrome ultra-optimisée pour serveur low-spec (1vCPU, 2GB RAM)"""
     options = webdriver.ChromeOptions()
     
-    # Options obligatoires pour Render
+    # Options critiques pour faibles ressources
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
-    options.add_argument("--disable-features=VizDisplayCompositor")
-    options.add_argument("--window-size=1920,1080")
-    # Optimisations mémoire pour Render
-    options.add_argument("--memory-pressure-off")
-    options.add_argument("--disable-background-networking")
+    options.add_argument("--disable-software-rasterizer")
     options.add_argument("--disable-background-timer-throttling")
-    options.add_argument("--disable-renderer-backgrounding")
     options.add_argument("--disable-backgrounding-occluded-windows")
+    options.add_argument("--disable-renderer-backgrounding")
+    options.add_argument("--disable-features=TranslateUI,BlinkGenPropertyTrees")
+    options.add_argument("--disable-ipc-flooding-protection")
+    
+    # Optimisation mémoire critique
+    options.add_argument("--memory-pressure-off")
+    options.add_argument("--max_old_space_size=512")
+    options.add_argument("--aggressive-cache-discard")
+    options.add_argument("--disable-background-networking")
+    options.add_argument("--disable-default-apps")
+    options.add_argument("--disable-sync")
+    
+    # Fenêtre minimale pour économiser la mémoire
+    options.add_argument("--window-size=800,600")
+    
+    # Désactiver tout le superflu
+    options.add_argument("--disable-images")
+    options.add_argument("--disable-javascript")
+    options.add_argument("--disable-plugins")
+    options.add_argument("--disable-extensions")
+    options.add_argument("--disable-web-security")
     options.add_argument("--disable-client-side-phishing-detection")
     options.add_argument("--disable-component-extensions-with-background-pages")
-    options.add_argument("--disable-default-apps")
     options.add_argument("--disable-hang-monitor")
-    options.add_argument("--disable-ipc-flooding-protection")
-    options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     
-    # Détection environnement Render
-    chrome_binary = os.environ.get("CHROME_BIN", "/usr/bin/chromium")
-    if os.path.exists(chrome_binary):
-        options.binary_location = chrome_binary
+    # User agent minimal
+    options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36")
+    
+    logging.info("⚡ Configuration Chrome ultra-optimisée pour serveur low-spec")
     
     try:
-        driver_path = os.environ.get("CHROMEDRIVER_PATH", "/usr/bin/chromedriver")
-        service = Service(driver_path) if os.path.exists(driver_path) else Service()
+        # Utiliser webdriver-manager avec cache pour éviter les téléchargements répétés
+        driver_path = ChromeDriverManager().install()
+        service = Service(driver_path)
+        # Configurer des timeouts courts pour libérer la mémoire rapidement
         driver = webdriver.Chrome(service=service, options=options)
-        logging.info("✅ Chrome initialisé avec succès pour Render")
+        driver.set_page_load_timeout(30)  # Timeout court
+        driver.implicitly_wait(5)  # Attente implicite réduite
+        logging.info("✅ Chrome initialisé (mode ultra-optimisé)")
         return driver
     except Exception as e:
-        logging.error(f"❌ Erreur Chrome: {str(e)}")
+        logging.error(f"❌ Impossible d'initialiser Chrome: {str(e)}")
         raise
 
-def automatiser_sondage_mcdo_night(headless=True, ticket_code=None):
+def automatiser_sondage_mcdo(headless=True, ticket_code=None):
     """
-    Automatise le sondage McDonald's en mode livraison - période du soir
+    Automatise le sondage McDonald's en mode standard (sur place ou à emporter)
     Version adaptée pour Render
     
     Args:
@@ -71,11 +91,15 @@ def automatiser_sondage_mcdo_night(headless=True, ticket_code=None):
         ticket_code (str): Code du ticket de caisse si disponible
     """
     config_logging()
-    logging.info("🌙 Démarrage automatisation sondage - Mode LIVRAISON SOIR")
+    logging.info("🍟 Démarrage automatisation sondage - Mode STANDARD")
+    
+    # Variables globales
+    global eatIn
+    eatIn = None
     
     try:
         # Utiliser la configuration Render
-        driver = setup_chrome_for_render()
+        driver = setup_chrome_for_debian()
     except Exception as e:
         logging.error(f"❌ Impossible d'initialiser Chrome: {str(e)}")
         return False
@@ -140,7 +164,7 @@ def automatiser_sondage_mcdo_night(headless=True, ticket_code=None):
                 logging.error(f"❌ Erreur sur la page {page_actuelle}: {str(e)}")
                 break
                 
-        logging.info(f"🎉 Sondage LIVRAISON SOIR complété avec succès : {page_actuelle-1} pages remplies")
+        logging.info(f"🎉 Sondage STANDARD complété avec succès : {page_actuelle-1} pages remplies")
         return True
         
     except Exception as e:
@@ -150,15 +174,18 @@ def automatiser_sondage_mcdo_night(headless=True, ticket_code=None):
     finally:
         # Fermer le navigateur
         try:
-            driver.quit()
+            driver.quit()\n            # Forcer le garbage collection pour lib\u00e9rer la m\u00e9moire\n            import gc\n            gc.collect()
             logging.info("🔒 Navigateur fermé")
         except:
             pass
 
 def repondre_a_la_question(driver, page_num):
     """
-    Fonction qui identifie le type de question et y répond de manière appropriée pour le mode livraison du soir
+    Fonction qui identifie le type de question et y répond de manière appropriée pour le mode standard
     """
+    # Déclarer l'utilisation des variables globales
+    global eatIn
+    
     # Identification spécifique de la page du questionnaire basée sur le texte visible
     page_text = driver.page_source
     
@@ -188,28 +215,33 @@ def repondre_a_la_question(driver, page_num):
         date_field.send_keys(date_str)
         logging.info(f"📅 Date saisie: {date_str}")
         
-        # 2. Heure réaliste pour night (dîner tardif/collation 19h-23h)
-        night_hours = list(range(19, 24))  # 19h-23h
-        hour = random.choice(night_hours)
+        # 2. Heure réaliste pour standard (déjeuner 12h-14h30 et dîner 18h-21h30)
+        lunch_hours = list(range(12, 15))  # 12h-14h
+        dinner_hours = list(range(18, 22))  # 18h-21h
+        
+        # Choisir aléatoirement entre déjeuner et dîner
+        if random.choice([True, False]):
+            hour = random.choice(lunch_hours)
+        else:
+            hour = random.choice(dinner_hours)
+        
         minutes = random.choice([0, 15, 30, 45])
         
-        # Ajustements spéciaux pour le soir
-        if hour == 23 and minutes > 30:
-            minutes = 30  # Pas trop tard non plus
-        if hour == 19 and random.choice([True, False]):
-            # Parfois commencer un peu plus tôt le soir
-            hour = 18
-
+        # Ajustements spéciaux
+        if hour == 14 and minutes > 30:
+            minutes = 30  # Pas trop tard pour le déjeuner
+        elif hour == 21 and minutes > 30:
+            minutes = 30  # Pas trop tard pour le dîner
+        
         # Formater l'heure et les minutes
         hour_str = str(hour).zfill(2)
         minute_str = str(minutes).zfill(2)
-
+        
         hour_field = driver.find_element(By.CSS_SELECTOR, "input[id^='spl_rng_q_mc_q_hour']")
         hour_field.send_keys(hour_str)
-
+        
         minute_field = driver.find_element(By.CSS_SELECTOR, "input[id^='spl_rng_q_mc_q_minute']")
         minute_field.send_keys(minute_str)
-
         logging.info(f"⏰ Heure saisie: {hour_str}:{minute_str}")
         
         # 3. Numéro de restaurant
@@ -220,104 +252,104 @@ def repondre_a_la_question(driver, page_num):
         
     # Page "Où avez-vous passé votre commande"
     elif "Où avez-vous passé votre commande" in page_text:
-        logging.info("🚚 Page: Où avez-vous passé votre commande")
+        logging.info("🛒 Page: Où avez-vous passé votre commande")
         radio_buttons = driver.find_elements(By.CSS_SELECTOR, "input[type='radio']")
         
-        # Option 1: Identifier directement par ID (méthode la plus fiable)
-        try:
-            livraison_button = driver.find_element(By.ID, "onf_q_where_did_you_place_your_order_8")
-            livraison_button.click()
-            logging.info("✅ Mode de commande sélectionné: En livraison (par ID)")
-            return
-        except:
-            logging.info("🔍 ID de l'option livraison non trouvé, tentative par texte")
-        
-        # Option 2: Rechercher par texte
-        for i, button in enumerate(radio_buttons):
-            if button.is_displayed() and button.is_enabled():
-                element_id = button.get_attribute("id")
-                if element_id:
-                    # Chercher le texte "En livraison" dans le label
-                    label_elements = driver.find_elements(By.CSS_SELECTOR, f"label[for='{element_id}']")
-                    if not label_elements:
-                        try:
-                            # Chercher dans la structure des divs
-                            parent = button.find_element(By.XPATH, "./ancestor::div[contains(@class, 'option_optionContainer')]")
-                            caption_elements = parent.find_elements(By.CSS_SELECTOR, "span.option_caption")
-                            if caption_elements and len(caption_elements) > 0:
-                                if "livraison" in caption_elements[0].text.lower():
-                                    button.click()
-                                    logging.info(f"✅ Mode de commande sélectionné: En livraison (par texte)")
-                                    return
-                        except:
-                            continue
-        
-        # Option 3: Si l'option n'est toujours pas trouvée, on utilise l'index (en livraison est généralement la 7ème option)
-        if len(radio_buttons) >= 8:  # Il y a 8 options dans l'HTML fourni
-            radio_buttons[6].click()  # Index 6 = 7ème option
-            logging.info("✅ Mode de commande sélectionné: En livraison (par index 6)")
-        else:
-            # Fallback à la dernière option
-            radio_buttons[-1].click()
-            logging.info("✅ Mode de commande sélectionné: Option supposée livraison (dernière option)")
-        return
-    
-    # Page "Par quel service de livraison avez-vous passé votre commande ?"
-    elif "Par quel service de livraison" in page_text:
-        logging.info("🍕 Page: Service de livraison")
-        radio_buttons = driver.find_elements(By.CSS_SELECTOR, "input[type='radio']")
-        
-        # Option 1: Identifier directement Uber Eats par ID (méthode la plus fiable)
-        try:
-            uber_button = driver.find_element(By.ID, "onf_q_which_delivery_service_to_place_order_1")
-            uber_button.click()
-            logging.info("✅ Service de livraison sélectionné: UBER EATS (par ID)")
-            return
-        except:
-            logging.info("🔍 ID de l'option Uber Eats non trouvé, tentative par texte")
-        
-        # Option 2: Rechercher "UBER EATS" par texte
-        uber_found = False
-        for i, button in enumerate(radio_buttons):
-            if button.is_displayed() and button.is_enabled():
-                element_id = button.get_attribute("id")
-                if element_id:
-                    label_elements = driver.find_elements(By.CSS_SELECTOR, f"label[for='{element_id}']")
-                    if not label_elements:
-                        try:
-                            parent = button.find_element(By.XPATH, "./ancestor::div[contains(@class, 'option_optionContainer')]")
-                            label_elements = parent.find_elements(By.CSS_SELECTOR, "span.option_caption")
-                        except:
-                            continue
-                    
-                    if label_elements and len(label_elements) > 0:
-                        label_text = label_elements[0].text.lower()
-                        if "uber" in label_text or "uber eats" in label_text:
-                            button.click()
-                            uber_found = True
-                            logging.info("✅ Service de livraison sélectionné: UBER EATS (par texte)")
-                            return
-        
-        # Option 3: Sélectionner la première option (généralement Uber Eats)
-        if not uber_found and len(radio_buttons) >= 1:
-            radio_buttons[0].click()  # La 1ère option
-            logging.info("✅ Service de livraison sélectionné: Option supposée Uber Eats (1ère option)")
-        else:
-            # Option par défaut (première option) si tout échoue
-            radio_buttons[0].click()
-            logging.info("✅ Service de livraison sélectionné: Premier choix (par défaut)")
+        # Mode standard: choisir aléatoirement entre en restaurant ou drive
+        option_index = random.randint(0, 1)
+        radio_buttons[option_index].click()
+        mode = "En restaurant" if option_index == 0 else "Au drive"
+        logging.info(f"✅ Mode de commande sélectionné: {mode}")
         return
         
     # Page "Avez-vous : Consommé sur place / Pris à emporter"
     elif "Avez-vous :" in page_text and "Consommé sur place" in page_text:
-        logging.info("📦 Page: Consommé sur place ou à emporter")
+        logging.info("🍽️ Page: Consommé sur place ou à emporter")
         radio_buttons = driver.find_elements(By.CSS_SELECTOR, "input[type='radio']")
         
         if len(radio_buttons) >= 2:
-            # En mode livraison, toujours sélectionner "à emporter"
-            radio_buttons[1].click()
-            logging.info("✅ Mode de consommation: à emporter (car en livraison)")
+            # Choix aléatoire entre sur place et à emporter
+            option_index = random.randint(0, 1)
+            radio_buttons[option_index].click()
+            
+            # Sauvegarder ce choix pour la prochaine page
+            eatIn = (option_index == 0)  # True si consommé sur place
+            mode = "sur place" if eatIn else "à emporter"
+            logging.info(f"✅ Mode de consommation: {mode}")
             return
+    
+    # Page "Où avez-vous récupéré votre commande"
+    elif "Où avez-vous récupéré votre commande" in page_text:
+        logging.info("📦 Page: Où avez-vous récupéré votre commande")
+        radio_buttons = driver.find_elements(By.CSS_SELECTOR, "input[type='radio']")
+        
+        selected_index = 0
+        
+        # Si on a mangé sur place (eatIn=True), sélectionner "En service à table"
+        if eatIn:
+            logging.info("🔍 Mode 'Consommé sur place' - Recherche de l'option 'En service à table'")
+            service_table_found = False
+            
+            for i, button in enumerate(radio_buttons):
+                if button.is_displayed() and button.is_enabled():
+                    element_id = button.get_attribute("id")
+                    if element_id:
+                        label_elements = driver.find_elements(By.CSS_SELECTOR, f"label[for='{element_id}']")
+                        if not label_elements:
+                            try:
+                                parent = button.find_element(By.XPATH, "./ancestor::div[contains(@class, 'option_optionContainer')]")
+                                label_elements = parent.find_elements(By.CSS_SELECTOR, "span.option_caption")
+                            except:
+                                continue
+                        
+                        if label_elements and len(label_elements) > 0:
+                            label_text = label_elements[0].text.lower()
+                            
+                            if "service à table" in label_text or "en service à table" in label_text or "table" in label_text:
+                                selected_index = i
+                                service_table_found = True
+                                logging.info("✅ Option 'En service à table' trouvée")
+                                break
+            
+            # Si "Service à table" n'est pas trouvé, essayer la dernière option
+            if not service_table_found and len(radio_buttons) > 2:
+                selected_index = len(radio_buttons) - 1
+                logging.info("⚠️ Sélection de la dernière option comme 'Service à table'")
+        else:
+            # Pour "À emporter", rechercher "Au comptoir"
+            logging.info("🔍 Mode 'Pris à emporter' - Recherche de l'option 'Au comptoir'")
+            comptoir_found = False
+            
+            for i, button in enumerate(radio_buttons):
+                if button.is_displayed() and button.is_enabled():
+                    element_id = button.get_attribute("id")
+                    if element_id:
+                        label_elements = driver.find_elements(By.CSS_SELECTOR, f"label[for='{element_id}']")
+                        if not label_elements:
+                            try:
+                                parent = button.find_element(By.XPATH, "./ancestor::div[contains(@class, 'option_optionContainer')]")
+                                label_elements = parent.find_elements(By.CSS_SELECTOR, "span.option_caption")
+                            except:
+                                continue
+                        
+                        if label_elements and len(label_elements) > 0:
+                            label_text = label_elements[0].text.lower()
+                            
+                            if "comptoir" in label_text or "au comptoir" in label_text:
+                                selected_index = i
+                                comptoir_found = True
+                                logging.info("✅ Option 'Au comptoir' trouvée")
+                                break
+            
+            # Si "Au comptoir" n'est pas trouvé, sélectionner la première option
+            if not comptoir_found:
+                logging.info("⚠️ Sélection de la première option comme 'Au comptoir'")
+        
+        # Cliquer sur l'option sélectionnée
+        radio_buttons[selected_index].click()
+        selected_option = "En service à table" if eatIn else "Au comptoir"
+        logging.info(f"✅ Récupération de commande sélectionnée: {selected_option}")
+        return
     
     # Page sur la qualité de l'expérience "satisfait(e) de cette expérience"
     elif "satisfait(e) de cette expérience" in page_text:
@@ -340,16 +372,17 @@ def repondre_a_la_question(driver, page_num):
     elif "Et dans quelle mesure avez-vous été satisfait(e) de chacune de ces dimensions" in page_text:
         logging.info("📊 Page: Dimensions de satisfaction")
         
-        # Liste des IDs connus des dimensions pour le mode livraison
-        delivery_dimension_ids = [
-            "onf_q_mc_q_quality_of_food_and_drink_1",              # Qualité des produits
+        # Liste des IDs connus des dimensions pour le mode standard
+        standard_dimension_ids = [
+            "onf_q_mc_q_cleanliness_exterior_aspect_restaurant_1",  # Propreté du restaurant
             "onf_q_mc_q_speed_service_1",                          # Rapidité du service
-            "onf_q_mc_q_friendliness_delivery_person_1"            # Amabilité du livreur
+            "onf_q_mc_q_quality_of_food_and_drink_1",              # Qualité des produits
+            "onf_q_mc_q_friendliness_crew_1"                       # Amabilité du personnel
         ]
         
         # Essayer chaque ID
         dimensions_clicked = 0
-        for dim_id in delivery_dimension_ids:
+        for dim_id in standard_dimension_ids:
             try:
                 option = driver.find_element(By.ID, dim_id)
                 option.click()
@@ -423,50 +456,6 @@ def repondre_a_la_question(driver, page_num):
             logging.info("✅ Problème rencontré: Non")
             return
             
-    # Page "Dans quel(s) domaine(s) votre expérience en livraison à domicile aurait-elle pu être améliorée ?"
-    elif "Dans quel(s) domaine(s) votre expérience en livraison" in page_text:
-        logging.info("🔧 Page: Domaines d'amélioration en livraison")
-        
-        # Rechercher d'abord par ID
-        try:
-            aucune_option = driver.find_element(By.ID, "ch_q_feedback_m_delivery_experience_improvement_10")
-            aucune_option.click()
-            logging.info("✅ Option 'Aucune de ces réponses' sélectionnée par ID")
-            return
-        except:
-            logging.info("🔍 ID de l'option 'Aucune de ces réponses' non trouvé, recherche par texte")
-        
-        # Rechercher l'option "Aucune de ces réponses" par texte
-        checkboxes = driver.find_elements(By.CSS_SELECTOR, "input[type='checkbox']")
-        aucune_option_found = False
-        
-        for checkbox in checkboxes:
-            if checkbox.is_displayed() and checkbox.is_enabled():
-                element_id = checkbox.get_attribute("id")
-                if element_id:
-                    label_elements = driver.find_elements(By.CSS_SELECTOR, f"label[for='{element_id}']")
-                    if not label_elements:
-                        try:
-                            parent = checkbox.find_element(By.XPATH, "./ancestor::div[contains(@class, 'option_optionContainer')]")
-                            label_elements = parent.find_elements(By.CSS_SELECTOR, "span.option_caption")
-                        except:
-                            continue
-                    
-                    if label_elements and len(label_elements) > 0:
-                        label_text = label_elements[0].text.lower()
-                        
-                        if "aucune" in label_text or "aucune de ces réponses" in label_text:
-                            checkbox.click()
-                            aucune_option_found = True
-                            logging.info("✅ Option 'Aucune de ces réponses' trouvée et sélectionnée")
-                            break
-        
-        # Si l'option "Aucune de ces réponses" n'a pas été trouvée, sélectionner la dernière option
-        if not aucune_option_found and len(checkboxes) > 0:
-            checkboxes[-1].click()
-            logging.info("✅ Sélection de la dernière option pour les domaines d'amélioration")
-        return
-            
     # Pour les autres pages, fallback vers le comportement standard
     try:
         radio_buttons = driver.find_elements(By.CSS_SELECTOR, "input[type='radio']")
@@ -503,7 +492,7 @@ def repondre_a_la_question(driver, page_num):
                 # Vérifier si le champ est visible et activé
                 if field.is_displayed() and field.is_enabled():
                     # Répondre avec un texte générique positif
-                    field.send_keys("Très bonne expérience. Service rapide et livraison efficace.")
+                    field.send_keys("Très bonne expérience. Service rapide et personnel sympathique.")
             
             logging.info("✅ Répondu à une ou plusieurs questions textuelles")
             return
@@ -515,13 +504,13 @@ def repondre_a_la_question(driver, page_num):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Automatisation du sondage McDonald's - Mode Livraison Soir - Version Render")
+    parser = argparse.ArgumentParser(description="Automatisation du sondage McDonald's - Mode Standard - Version Render")
     parser.add_argument('--headless', action='store_true', help="Exécuter en mode headless (sans interface graphique)")
     parser.add_argument('--ticket', type=str, help="Code du ticket de caisse (si nécessaire)")
     
     args = parser.parse_args()
     
-    automatiser_sondage_mcdo_night(
+    automatiser_sondage_mcdo(
         headless=args.headless, 
         ticket_code=args.ticket
     )

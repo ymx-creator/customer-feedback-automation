@@ -5,37 +5,10 @@ FROM python:3.11-slim
 LABEL maintainer="McDonald's Survey Bot"
 LABEL description="Automated McDonald's survey bot running on Render"
 
-# Installation des dépendances système pour Chrome
-RUN apt-get update && apt-get install -y \
-    wget \
-    curl \
-    unzip \
-    gnupg \
-    ca-certificates \
-    fonts-liberation \
-    libasound2 \
-    libatk-bridge2.0-0 \
-    libdrm2 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxrandr2 \
-    libgbm1 \
-    libgtk-3-0 \
-    libxss1 \
-    libnss3 \
-    libgconf-2-4 \
-    libfontconfig1 \
+# Installation reproductible de Chromium et ChromeDriver
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends chromium chromium-driver ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-
-# Installation de Google Chrome
-RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list \
-    && apt-get update \
-    && apt-get install -y google-chrome-stable \
-    && rm -rf /var/lib/apt/lists/*
-
-# Supprimer l'ancien ChromeDriver s'il existe et laisser webdriver-manager le gérer
-RUN rm -f /usr/local/bin/chromedriver
 
 # Création d'un utilisateur non-root pour la sécurité
 RUN useradd --create-home --shell /bin/bash mcdo-bot
@@ -61,18 +34,15 @@ RUN chown -R mcdo-bot:mcdo-bot /app
 USER mcdo-bot
 
 # Variables d'environnement
-ENV CHROME_BIN=/usr/bin/google-chrome
-ENV CHROME_DRIVER=/usr/local/bin/chromedriver
+ENV CHROME_BIN=/usr/bin/chromium
+ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver
 ENV PYTHONPATH=/app
 ENV RENDER=true
 ENV TZ=Europe/Paris
 
-# Port exposé
-EXPOSE 5000
-
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:5000/health || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health', timeout=3)"
 
 # Commande de démarrage avec Gunicorn pour la production
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--timeout", "180", "--worker-class", "sync", "--max-requests", "50", "--max-requests-jitter", "10", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--timeout", "180", "--worker-class", "sync", "--access-logfile", "-", "--max-requests", "50", "--max-requests-jitter", "10", "app:app"]

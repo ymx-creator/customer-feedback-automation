@@ -21,6 +21,11 @@ from scripts.mcdo_night_automation import automatiser_sondage_mcdo_night
 
 # Configuration Flask sécurisée
 app = Flask(__name__)
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SECURE=os.environ.get('SESSION_COOKIE_SECURE', 'true').lower() == 'true',
+    SESSION_COOKIE_SAMESITE='Lax'
+)
 
 # Configuration sécurisée pour l'authentification
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
@@ -31,10 +36,14 @@ def init_auth():
     global AUTH_PASSWORD_HASH
     
     # Récupérer le mot de passe depuis les variables d'environnement
-    auth_password = os.environ.get('AUTH_PASSWORD', 'admin123')  # Mot de passe par défaut pour dev
+    auth_password = os.environ.get('AUTH_PASSWORD')
+    if not auth_password:
+        raise RuntimeError("AUTH_PASSWORD must be configured")
     
     # Hasher le mot de passe avec sel pour la sécurité
-    salt = os.environ.get('AUTH_SALT', 'mcdo_bot_2024')
+    salt = os.environ.get('AUTH_SALT')
+    if not salt:
+        raise RuntimeError("AUTH_SALT must be configured")
     AUTH_PASSWORD_HASH = hashlib.pbkdf2_hmac('sha256', 
                                            auth_password.encode('utf-8'), 
                                            salt.encode('utf-8'), 
@@ -52,7 +61,7 @@ def verify_password(password):
         return False
     
     # Hasher le mot de passe fourni avec le même sel
-    salt = os.environ.get('AUTH_SALT', 'mcdo_bot_2024')
+    salt = os.environ['AUTH_SALT']
     provided_hash = hashlib.pbkdf2_hmac('sha256', 
                                       password.encode('utf-8'), 
                                       salt.encode('utf-8'), 
@@ -116,8 +125,9 @@ last_executions = {
     "NIGHT": {"timestamp": None, "success": None, "duration": 0}
 }
 global_stats = {"total": 0, "success": 0, "failed": 0}
+daily_sessions = {}
 
-def log_execution(script_name: str, success: bool, duration: float):
+def log_execution(script_name: str, success: bool, duration: float, successful_surveys: int = None, failed_surveys: int = None):
     """Enregistre l'exécution simple pour Render Free Tier"""
     global last_executions, global_stats
     
@@ -139,6 +149,33 @@ def log_execution(script_name: str, success: bool, duration: float):
     # Log essentiel seulement
     status = "✅" if success else "❌"
     logging.info(f"{status} {script_name}: {duration:.1f}s")
+
+    paris_tz = pytz.timezone('Europe/Paris')
+    log_date = datetime.now(paris_tz).strftime('%Y-%m-%d')
+    daily_sessions.setdefault(log_date, []).append({
+        "script": script_name,
+        "success": success,
+        "duration": round(duration, 1),
+        "successful_surveys": successful_surveys if successful_surveys is not None else int(success),
+        "failed_surveys": failed_surveys if failed_surveys is not None else int(not success)
+    })
+    total_surveys = daily_sessions[log_date][-1]["successful_surveys"] + daily_sessions[log_date][-1]["failed_surveys"]
+    logging.info(
+        f"[SCHEDULER_RECAP] script={script_name} status={'SUCCESS' if success else 'FAILED'} "
+        f"surveys={successful_surveys if successful_surveys is not None else int(success)}/{total_surveys} "
+        f"duration_seconds={round(duration, 1)}"
+    )
+
+def emit_daily_recap(log_date):
+    """Write one end-of-day recap to the scheduler service log."""
+    sessions = daily_sessions.pop(log_date, [])
+    success = sum(session["successful_surveys"] for session in sessions)
+    failed = sum(session["failed_surveys"] for session in sessions)
+    logging.info(
+        f"[DAILY_RECAP] date={log_date} sessions={len(sessions)} "
+        f"success={success} failed={failed} "
+        f"success_rate={round((success / (success + failed)) * 100, 1) if success + failed else 0}%"
+    )
 
 def update_current_action(main_action=None, sub_action=None, progress=0, next_step=None, can_stop=False):
     """Met à jour les actions en cours pour le monitoring"""
@@ -1661,7 +1698,7 @@ def run_standard_survey():
     clear_current_action()
     
     # Logger pour les statistiques globales
-    log_execution("STANDARD", total_success > 0, session_duration)
+    log_execution("STANDARD", total_success > 0, session_duration, total_success, total_failed)
     return total_success > 0
 
 def run_morning_survey():
@@ -1752,7 +1789,7 @@ def run_morning_survey():
     clear_current_action()
     
     # Logger pour les statistiques globales
-    log_execution("MORNING", total_success > 0, session_duration)
+    log_execution("MORNING", total_success > 0, session_duration, total_success, total_failed)
     return total_success > 0
 
 def run_night_survey():
@@ -1843,21 +1880,13 @@ def run_night_survey():
     clear_current_action()
     
     # Logger pour les statistiques globales
-    log_execution("NIGHT", total_success > 0, session_duration)
+    log_execution("NIGHT", total_success > 0, session_duration, total_success, total_failed)
     return total_success > 0
 
 def schedule_surveys():
     """Vérification directe des heures - Plus robuste que schedule"""
     
-    print("📅 ========== SCHEDULER SIMPLIFIÉ DÉMARRÉ ==========")
-    print("   🍟 Standard: 12:00 Paris")
-    print("   🌅 Morning:  10:00 Paris") 
-    print("   🌙 Night:    19:00 Paris")
-    
-    logging.info("📅 ========== SCHEDULER SIMPLIFIÉ DÉMARRÉ ==========")
-    logging.info("   🍟 Standard: 12:00 Paris")
-    logging.info("   🌅 Morning:  10:00 Paris")
-    logging.info("   🌙 Night:    19:00 Paris")
+    logging.info("[SCHEDULER_RECAP] status=started schedules=morning@10:00,standard@12:00,night@19:00 timezone=Europe/Paris")
     
     executed_today = {
         'standard': False,
@@ -1877,23 +1906,17 @@ def schedule_surveys():
             
             # Reset à minuit
             if current_date != last_date:
+                emit_daily_recap(last_date)
                 executed_today = {'standard': False, 'morning': False, 'night': False}
                 last_date = current_date
                 logging.info(f"🗓️ Nouveau jour - Reset des exécutions: {current_date}")
             
-            # TEST TEMPORAIRE: Standard à 18:00 Paris (au lieu de 12:00)
-            if current_hour == 18 and current_minute == 0 and not executed_today['standard']:
-                logging.info("🧪 TEST DÉCLENCHEMENT Standard - 18:00 Paris")
+            # Standard: 12:00 Paris
+            if current_hour == 12 and current_minute == 0 and not executed_today['standard']:
+                logging.info("🍟 DÉCLENCHEMENT Standard - 12:00 Paris")
                 executed_today['standard'] = True
                 thread = threading.Thread(target=run_standard_survey, daemon=True)
                 thread.start()
-            
-            # Standard: 12:00 Paris (DÉSACTIVÉ POUR TEST)
-            # if current_hour == 12 and current_minute == 0 and not executed_today['standard']:
-            #     logging.info("🍟 DÉCLENCHEMENT Standard - 12:00 Paris")
-            #     executed_today['standard'] = True
-            #     thread = threading.Thread(target=run_standard_survey, daemon=True)
-            #     thread.start()
             
             # Morning: 10:00 Paris
             elif current_hour == 10 and current_minute == 0 and not executed_today['morning']:
@@ -1948,6 +1971,8 @@ def test_scripts():
 def initialize_scheduler_for_gunicorn():
     """Démarre le scheduler automatiquement même avec Gunicorn"""
     global scheduler_initialized
+    if os.environ.get('DISABLE_SCHEDULER', 'false').lower() == 'true':
+        return
     if not scheduler_initialized:
         print("🚀 INITIALISATION AUTOMATIQUE DU SCHEDULER (GUNICORN)")
         print(f"🔄 Worker PID: {os.getpid()}")

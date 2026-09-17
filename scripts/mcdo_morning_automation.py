@@ -3,7 +3,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
-from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
 import time
 import random
@@ -48,40 +47,13 @@ def setup_chrome_for_render():
     options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     
     # Détection environnement Render
-    if os.getenv('RENDER') or os.getenv('PORT'):
-        options.binary_location = "/usr/bin/google-chrome"
-        logging.info("🐳 Environnement Render détecté")
+    chrome_binary = os.environ.get("CHROME_BIN", "/usr/bin/chromium")
+    if os.path.exists(chrome_binary):
+        options.binary_location = chrome_binary
     
     try:
-        # Utiliser webdriver-manager pour télécharger automatiquement la bonne version
-        driver_path = ChromeDriverManager().install()
-        
-        # Vérifier et corriger le chemin si nécessaire (bug webdriver-manager avec Chrome for Testing)
-        if not os.path.exists(driver_path) or not os.access(driver_path, os.X_OK):
-            # Tenter de trouver le vrai exécutable dans le même répertoire
-            import glob
-            directory = os.path.dirname(driver_path)
-            possible_paths = [
-                os.path.join(directory, "chromedriver"),
-                os.path.join(directory, "chromedriver-linux64", "chromedriver")
-            ]
-            
-            for alt_path in possible_paths:
-                if os.path.exists(alt_path) and os.access(alt_path, os.X_OK):
-                    driver_path = alt_path
-                    logging.info(f"🔧 Chemin ChromeDriver corrigé: {driver_path}")
-                    break
-            else:
-                # Chercher récursivement
-                pattern = os.path.join(directory, "**/chromedriver")
-                found_drivers = glob.glob(pattern, recursive=True)
-                for found_path in found_drivers:
-                    if os.access(found_path, os.X_OK):
-                        driver_path = found_path
-                        logging.info(f"🔧 Chemin ChromeDriver trouvé: {driver_path}")
-                        break
-        
-        service = Service(driver_path)
+        driver_path = os.environ.get("CHROMEDRIVER_PATH", "/usr/bin/chromedriver")
+        service = Service(driver_path) if os.path.exists(driver_path) else Service()
         driver = webdriver.Chrome(service=service, options=options)
         logging.info("✅ Chrome initialisé avec succès pour Render")
         return driver
